@@ -2,89 +2,89 @@
 name: CI
 
 on:
- 	push: {}
- 	pull_request: {}
-	schedule:
-		# Weekly vulnerability scan and CI run
-		- cron: '0 3 * * 0'
+  push: {}
+  pull_request: {}
+  schedule:
+    # Weekly vulnerability scan and CI run
+    - cron: '0 3 * * 0'
 
 jobs:
-	backend-test:
-		name: Backend unit tests
-		runs-on: ubuntu-latest
-		steps:
-			- name: Checkout
-				uses: actions/checkout@v4
+  backend-test:
+    name: Backend unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-			- name: Setup Node.js
-				uses: actions/setup-node@v4
-				with:
-					node-version: '18'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
-			- name: Cache npm
-				uses: actions/cache@v4
-				with:
-					path: ~/.npm
-					key: ${{ runner.os }}-node-${{ hashFiles('**/apps/backend/package.json') }}
-					restore-keys: |
-						${{ runner.os }}-node-
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/apps/backend/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
-			- name: Install dependencies
-				working-directory: apps/backend
-				run: npm ci
+      - name: Install dependencies
+        working-directory: apps/backend
+        run: npm ci
 
-			- name: Lint
-				working-directory: apps/backend
-				run: npm run lint
+      - name: Lint
+        working-directory: apps/backend
+        run: npm run lint
 
-			- name: Run unit tests
-				working-directory: apps/backend
-				run: npm test
+      - name: Run unit tests
+        working-directory: apps/backend
+        run: npm test
 
-	frontend-test:
-		name: Frontend tests (lint + build)
-		runs-on: ubuntu-latest
-		needs: backend-test
-		steps:
-			- name: Checkout
-				uses: actions/checkout@v4
+  frontend-test:
+    name: Frontend tests (lint + unit tests)
+    runs-on: ubuntu-latest
+    needs: backend-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-			- name: Setup Node.js
-				uses: actions/setup-node@v4
-				with:
-					node-version: '18'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
-			- name: Cache npm
-				uses: actions/cache@v4
-				with:
-					path: ~/.npm
-					key: ${{ runner.os }}-node-${{ hashFiles('**/apps/frontend/package-lock.json') }}
-					restore-keys: |
-						${{ runner.os }}-node-
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/apps/frontend/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
-			- name: Install dependencies
-				working-directory: apps/frontend
-				run: npm install
+      - name: Install dependencies
+        working-directory: apps/frontend
+        run: npm install
 
-			- name: Lint
-				working-directory: apps/frontend
-				run: npm run lint
+      - name: Lint
+        working-directory: apps/frontend
+        run: npm run lint
 
-			- name: Run unit tests
-				working-directory: apps/frontend
-				run: npm test
+      - name: Run unit tests
+        working-directory: apps/frontend
+        run: npm test
 
-	dependabot-vuln-scan:
-		name: Dependabot vulnerability scan
-		runs-on: ubuntu-latest
-		needs: [ backend-test, frontend-test ]
-		steps:
-			- name: Checkout
-				uses: actions/checkout@v4
+  dependabot-vuln-scan:
+    name: Dependabot vulnerability scan
+    runs-on: ubuntu-latest
+    needs: [ backend-test, frontend-test ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-			- name: Dependency review
-				uses: github/dependency-review-action@v2
-				with:
-					# Fail the job if vulnerabilities of severity 'moderate' or above are detected
-					fail-on-severity: 'moderate'
+      - name: Dependency review
+        uses: github/dependency-review-action@v2
+        with:
+          # Fail the job if vulnerabilities of severity 'moderate' or above are detected
+          fail-on-severity: 'moderate'
 
