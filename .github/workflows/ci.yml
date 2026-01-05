@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Cache npm
         uses: actions/cache@v4
@@ -52,7 +52,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Cache npm
         uses: actions/cache@v4
@@ -64,8 +64,8 @@ jobs:
 
       - name: Install dependencies
         working-directory: apps/frontend
-        # Use legacy-peer-deps to avoid npm ERESOLVE errors with React 19 vs testing libs
-        run: npm ci --legacy-peer-deps
+        # Use legacy-peer-deps and `npm install` to update lockfile when needed
+        run: npm install --legacy-peer-deps
 
       - name: Lint
         working-directory: apps/frontend
