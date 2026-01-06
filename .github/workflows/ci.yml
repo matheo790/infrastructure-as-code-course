@@ -23,7 +23,7 @@ jobs:
 
       - name: 🟩 Install dependencies
         working-directory: apps/backend
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: 🧑‍🎨 Lint
         working-directory: apps/backend
