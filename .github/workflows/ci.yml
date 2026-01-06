@@ -7,9 +7,6 @@ permissions:
 on:
   push: {}
   pull_request: {}
-  schedule:
-    # Weekly vulnerability scan and CI run
-    - cron: '0 3 * * 0'
 
 jobs:
   backend-test:
@@ -67,7 +64,6 @@ jobs:
 
       - name: Install dependencies
         working-directory: apps/frontend
-        # Use legacy-peer-deps and `npm install` to update lockfile when needed
         run: npm install --legacy-peer-deps
 
       - name: Lint
@@ -86,10 +82,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Dependency review (skipped)
-        run: |
-          echo "github/dependency-review-action not available in this environment."
-          echo "Falling back to npm audit steps included below."
 
       - name: Run npm audit (backend)
         working-directory: apps/backend
