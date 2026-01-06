@@ -68,12 +68,12 @@ jobs:
       - name: 🔐 Run npm audit (backend)
         working-directory: apps/backend
         run: |
-          npm ci
+          npm ci --legacy-peer-deps
           npm audit --audit-level=moderate
 
       - name: 🔐 Run npm audit (frontend)
         working-directory: apps/frontend
         run: |
-          npm ci
+          npm ci --legacy-peer-deps
           npm audit --audit-level=moderate
 
