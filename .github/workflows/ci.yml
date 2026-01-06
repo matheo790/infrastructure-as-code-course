@@ -2,7 +2,7 @@
 name: CI
 
 permissions:
-  security-events: write
+  security-events: read
 
 on:
   push: {}
