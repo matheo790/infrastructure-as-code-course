@@ -47,7 +47,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: apps/frontend
-        run: npm ci --legacy-peer-deps
+        run: npm ci
 
       - name: 🧑‍🎨 Lint
         working-directory: apps/frontend
@@ -68,12 +68,12 @@ jobs:
       - name: 🔐 Run npm audit (backend)
         working-directory: apps/backend
         run: |
-          npm ci --legacy-peer-deps
+          npm ci
           npm audit --audit-level=moderate
 
       - name: 🔐 Run npm audit (frontend)
         working-directory: apps/frontend
         run: |
-          npm ci --legacy-peer-deps
+          npm ci
           npm audit --audit-level=moderate
 
