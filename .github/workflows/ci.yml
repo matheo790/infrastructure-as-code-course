@@ -131,7 +131,7 @@ jobs:
   docker-build-push-acr-frontend:
     name: 🐳 Build & Push Docker image to ACR (frontend)
     runs-on: ubuntu-latest
-    needs: [frontend-test, dependabot-vuln-scan]
+    needs: [frontend-test, dependabot-vuln-scan, create-git-tag]
     if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development')
     steps:
       - name: ✨ Checkout
@@ -172,7 +172,7 @@ jobs:
   docker-build-push-acr-backend:
     name: 🐳 Build & Push Docker image to ACR (backend)
     runs-on: ubuntu-latest
-    needs: [backend-test, dependabot-vuln-scan]
+    needs: [backend-test, dependabot-vuln-scan, create-git-tag]
     if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development')
     steps:
       - name: ✨ Checkout
