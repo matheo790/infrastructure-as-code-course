@@ -61,6 +61,7 @@ jobs:
     name: 🤖 Dependabot vulnerability scan
     runs-on: ubuntu-latest
     needs: [ backend-test, frontend-test ]
+    if: always()
     steps:
       - name: ✨ Checkout
         uses: actions/checkout@v4
