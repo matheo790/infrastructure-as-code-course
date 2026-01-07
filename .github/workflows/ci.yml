@@ -5,9 +5,14 @@ permissions:
   security-events: read
 
 on:
-  push: {}
-  pull_request: {}
-
+  push:
+    branches:
+      - main
+      - development
+  pull_request:
+    branches:
+      - main
+      - development
 jobs:
   backend-test:
     name: ⚙️ Backend unit tests
