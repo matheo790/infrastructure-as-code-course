@@ -95,11 +95,17 @@ jobs:
     if: github.ref_name == 'main' && github.event_name == 'push'
     outputs:
       next_tag: ${{ steps.version.outputs.next }}
+
     steps:
       - name: ✨ Checkout full history
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: 🔧 Configure Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: 🏷️ Get latest tag
         id: lasttag
@@ -126,7 +132,7 @@ jobs:
         run: |
           git tag -a "${{ steps.version.outputs.next }}" -m "Release ${{ steps.version.outputs.next }}"
           git push origin "${{ steps.version.outputs.next }}"
-
+        
   docker-build-push-acr-frontend:
     name: 🐳 Build & Push Docker image to ACR (frontend)
     runs-on: ubuntu-latest
