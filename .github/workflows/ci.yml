@@ -149,6 +149,8 @@ jobs:
           git fetch origin --force --prune --tags
 
       # ✅ MAIN: release automatique
+      
+            # ✅ MAIN: release automatique
       - name: 🚀 Release on main (bump package.json + tag)
         if: github.ref_name == 'main' && github.actor != 'github-actions[bot]'
         shell: bash
@@ -162,31 +164,41 @@ jobs:
           CURRENT_VER=$(node -p "require('./apps/backend/package.json').version")
           echo "Current version = v${CURRENT_VER}"
 
-          # 2) Bump version SANS commit auto
+          # 2) Si c'est une RC/snapshot, nettoyer avant de bumper
+          if [[ "$CURRENT_VER" =~ (-RC|-snapshot) ]]; then
+            # Extraire la base (X.Y.Z)
+            BASE=$(echo "$CURRENT_VER" | sed 's/-RC.*//' | sed 's/-snapshot.*//')
+            echo "⚠️ Detected RC/snapshot, bumping from base: $BASE"
+            (cd apps/backend && npm version "$BASE" --no-git-tag-version)
+            (cd apps/frontend && npm version "$BASE" --no-git-tag-version)
+          fi
+
+          # 3) Bump version SANS commit auto
           (cd apps/backend && npm version "$TYPE" --no-git-tag-version)
           NEW_VER=$(node -p "require('./apps/backend/package.json').version")
 
           echo "New version = v${NEW_VER}"
 
-          # 3) Vérifier que la version a changé
+          # 4) Vérifier que la version a changé
           if [ "${CURRENT_VER}" = "${NEW_VER}" ]; then
             echo "❌ Version n'a pas changé — abort"
             exit 1
           fi
 
-          # 4) Commit package.json + package-lock.json
+          # 5) Commit package.json + package-lock.json
           git add apps/backend/package.json apps/backend/package-lock.json
           git add apps/frontend/package.json apps/frontend/package-lock.json
 
           git commit -m "chore(release): v${NEW_VER}"
 
-          # 5) Créer le tag
+          # 6) Créer le tag
           git tag "v${NEW_VER}"
 
-          # 6) Push commit + tag séparément
+          # 7) Push commit + tag séparément
           git push origin HEAD:main
           git push origin "v${NEW_VER}"
-                 # 🧪 DEVELOPMENT: Snapshot version (1.0.0-snapshot.1)
+
+          # 🧪 DEVELOPMENT: Snapshot version (1.0.0-snapshot.1)
       - name: Snapshot on development
         if: github.ref_name == 'development'
         run: |
