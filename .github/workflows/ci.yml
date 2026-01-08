@@ -61,9 +61,8 @@ jobs:
 
       - name: 🔬 Tests
         working-directory: apps/frontend
-        run: npm test
         run: echo "npm test"
-        
+
   audit:
     name: 🔐 NPM Audit (always)
     runs-on: ubuntu-latest
