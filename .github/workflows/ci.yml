@@ -135,7 +135,7 @@ jobs:
           npm version "$RELEASE_TYPE"
 
           cd -
-          git push origin main --tags
+          git push origin HEAD:main --follow-tags
 
       # -----------------------------
       # DEVELOPMENT: vX.Y.Z-snapshot.N
