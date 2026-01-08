@@ -191,7 +191,6 @@ jobs:
           git tag "v${NEW}"
           git push origin HEAD:development --tags
 
-
       - name: 🧷 RC on staging (X.Y.Z-RC.N)
         if: github.ref_name == 'staging'
         shell: bash
