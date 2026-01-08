@@ -89,14 +89,27 @@ jobs:
           git push origin HEAD:main --follow-tags
 
             # 🧪 DEVELOPMENT: Snapshot version (1.0.0-snapshot.1)
+            # 🧪 DEVELOPMENT: Snapshot version (1.0.0-snapshot.1)
       - name: Snapshot on development
         if: github.ref_name == 'development'
         run: |
-          LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || echo "v1.0.0")
+          # Cherche la dernière version (stable OU snapshot)
+          LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "v1.0.0")
           BASE="${LATEST_TAG#v}"
-          LAST_SNAP=$(git tag --sort=-v:refname | grep "^v${BASE}-snapshot" | head -1)
-          if [ -z "$LAST_SNAP" ]; then N=1; else N=$(echo $LAST_SNAP | grep -o '[0-9]*$'); N=$((N+1)); fi
+          BASE="${BASE%-snapshot*}"
+          
+          # Cherche le dernier snapshot POUR CETTE base
+          LAST_SNAP=$(git tag --sort=-v:refname | grep "^v${BASE}-snapshot\." | head -1)
+          
+          if [ -z "$LAST_SNAP" ]; then
+            N=1
+          else
+            N=$(echo $LAST_SNAP | grep -o '[0-9]*$')
+            N=$((N + 1))
+          fi
+          
           NEW="${BASE}-snapshot.${N}"
+          echo "Creating snapshot: v$NEW"
           
           # Bump versions
           (cd apps/backend && npm version $NEW --no-git-tag-version 2>/dev/null || true)
