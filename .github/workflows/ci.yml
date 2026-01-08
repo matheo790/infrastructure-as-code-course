@@ -217,12 +217,23 @@ jobs:
           set -euo pipefail
           git fetch origin --force --prune --tags
 
-          STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
-          BASE="${STABLE#v}"; [ -z "${BASE:-}" ] && BASE="1.0.0"
+          # Cherche d'abord un RC existant sur staging
+          LAST_RC=$(git tag --sort=-v:refname | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+-RC\.[0-9]+$" | head -n 1 || true)
+          
+          if [ -z "${LAST_RC:-}" ]; then
+            # Pas de RC existant, cherche une version stable
+            STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+            BASE="${STABLE#v}"; [ -z "${BASE:-}" ] && BASE="1.0.0"
+            NEW="${BASE}-RC.1"
+          else
+            # Extrait la base (X.Y.Z) et le numéro RC
+            BASE="${LAST_RC%-RC.*}"
+            BASE="${BASE#v}"
+            N_RC="${LAST_RC##*-RC.}"
+            NEW="${BASE}-RC.$((N_RC + 1))"
+          fi
 
-          LAST_RC=$(git tag --sort=-v:refname | grep -E "^v${BASE}-RC\.[0-9]+$" | head -n 1 || true)
-          if [ -z "${LAST_RC:-}" ]; then N=1; else N=$(( ${LAST_RC##*.} + 1 )); fi
-          NEW="${BASE}-RC.${N}"
+          echo "Creating tag: v${NEW}"
 
           cd apps/backend
           npm version "${NEW}" --no-git-tag-version
