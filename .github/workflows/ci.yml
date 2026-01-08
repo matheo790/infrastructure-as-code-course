@@ -262,3 +262,4 @@ jobs:
           TAG="${{ needs.versioning.outputs.tag }}"
           docker tag cmatheo.azurecr.io/frontend:${TAG} cmatheo.azurecr.io/frontend:latest
           docker push cmatheo.azurecr.io/backend:latest
+
