@@ -3,6 +3,7 @@ name: CI
 permissions:
   contents: write
   security-events: read
+
 on:
   push:
     branches: [main, development, staging]
@@ -54,7 +55,6 @@ jobs:
       - name: 🟩 Install
         working-directory: apps/frontend
         run: npm ci --legacy-peer-deps
-        run: npm ci --legacy-peer-deps
 
       - name: 🧑‍🎨 Lint
         working-directory: apps/frontend
@@ -62,7 +62,7 @@ jobs:
 
       - name: 🔬 Tests
         working-directory: apps/frontend
-        run: echo "npm test"
+        run: npm test
 
   audit:
     name: 🔐 NPM Audit (always)
@@ -94,7 +94,6 @@ jobs:
     needs: [backend-test, frontend-test, audit]
     if: github.event_name != 'pull_request'
     outputs:
-      tag: ${{ steps.out.outputs.tag }}
       tag: ${{ steps.out.outputs.tag }}
     steps:
       - name: ✨ Checkout (full + tags)
