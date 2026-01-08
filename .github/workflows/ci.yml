@@ -210,6 +210,7 @@ jobs:
           git push origin HEAD:development --follow-tags
 
       # ---- staging: RC tags (tu peux laisser tel quel) ----
+        # ---- staging: RC tags (cherche le plus haut numéro de version) ----
       - name: 🧷 RC on staging (X.Y.Z-RC.N)
         if: github.ref_name == 'staging'
         shell: bash
@@ -217,18 +218,24 @@ jobs:
           set -euo pipefail
           git fetch origin --force --prune --tags
 
-          # Cherche d'abord un RC existant sur staging
-          LAST_RC=$(git tag --sort=-v:refname | grep -E "^v[0-9]+\.[0-9]+\.[0-9]+-RC\.[0-9]+$" | head -n 1 || true)
+          # Cherche la PLUS HAUTE version (stable + snapshot)
+          LAST_VERSION=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | grep -v -E '(-RC|-snapshot)' | head -n 1 || true)
+          
+          # Ou cherche le snapshot le plus récent si pas de stable
+          if [ -z "${LAST_VERSION:-}" ]; then
+            LAST_VERSION=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-snapshot\.[0-9]+)?$' | head -n 1 || true)
+          fi
+          
+          BASE="${LAST_VERSION#v}"; [ -z "${BASE:-}" ] && BASE="1.0.0"
+          # Nettoie le suffixe snapshot si présent
+          BASE="${BASE%-snapshot*}"
+
+          # Cherche les RC existants pour CETTE base
+          LAST_RC=$(git tag --sort=-v:refname | grep -E "^v${BASE}-RC\.[0-9]+$" | head -n 1 || true)
           
           if [ -z "${LAST_RC:-}" ]; then
-            # Pas de RC existant, cherche une version stable
-            STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
-            BASE="${STABLE#v}"; [ -z "${BASE:-}" ] && BASE="1.0.0"
             NEW="${BASE}-RC.1"
           else
-            # Extrait la base (X.Y.Z) et le numéro RC
-            BASE="${LAST_RC%-RC.*}"
-            BASE="${BASE#v}"
             N_RC="${LAST_RC##*-RC.}"
             NEW="${BASE}-RC.$((N_RC + 1))"
           fi
