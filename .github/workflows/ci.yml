@@ -184,7 +184,7 @@ jobs:
           git push origin HEAD:main
           git push origin "v${NEW_VER}"
 
-            # 🧪 DEVELOPMENT: Snapshot version (1.0.0-snapshot.1)
+                 # 🧪 DEVELOPMENT: Snapshot version (1.0.0-snapshot.1)
       - name: Snapshot on development
         if: github.ref_name == 'development'
         run: |
@@ -213,8 +213,9 @@ jobs:
           # Commit & tag
           git add apps/backend/package.json apps/backend/package-lock.json apps/frontend/package.json apps/frontend/package-lock.json
           git commit -m "chore(snapshot): v$NEW" || true
-          git tag "v$NEW"
-          git push origin HEAD:development --follow-tags
+          git tag "v$NEW" --force
+          git push origin HEAD:development || true
+          git push origin "v$NEW" --force
 
         # ✅ STAGING: RC tags
       - name: 🧷 RC on staging (X.Y.Z-RC.N)
