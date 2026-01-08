@@ -149,6 +149,7 @@ jobs:
           git fetch origin --force --prune --tags
 
       # ✅ MAIN: release automatique
+            # ✅ MAIN: release automatique
       - name: 🚀 Release on main (bump package.json + tag)
         if: github.ref_name == 'main' && github.actor != 'github-actions[bot]'
         shell: bash
@@ -177,13 +178,13 @@ jobs:
 
           git commit -m "chore(release): v${NEW_VER}"
 
-          # 3) Créer le tag
-          git tag "v${NEW_VER}"
+          # 3) Créer le tag (avec --force si existant)
+          git tag "v${NEW_VER}" --force
 
           # 4) Push commit + tag séparément
           git push origin HEAD:main
-          git push origin "v${NEW_VER}"
-
+          git push origin "v${NEW_VER}" --force
+          
                  # 🧪 DEVELOPMENT: Snapshot version (1.0.0-snapshot.1)
       - name: Snapshot on development
         if: github.ref_name == 'development'
