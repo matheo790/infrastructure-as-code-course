@@ -81,6 +81,7 @@ jobs:
           npm ci
           npm audit --audit-level=moderate
 
+
       - name: 🔐 Audit frontend
         working-directory: apps/frontend
         run: |
