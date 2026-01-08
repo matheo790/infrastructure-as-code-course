@@ -169,6 +169,7 @@ jobs:
           git status --short
 
           git add apps/backend/package.json apps/backend/package-lock.json
+          git add apps/frontend/package.json apps/frontend/package-lock.json
 
           if git diff --cached --quiet; then
             echo "❌ package.json n'a pas changé — abort"
@@ -205,6 +206,7 @@ jobs:
           cd -
 
           git add apps/backend/package.json apps/backend/package-lock.json || true
+          git add apps/frontend/package.json apps/frontend/package-lock.json || true
           git commit -m "chore(snapshot): v${NEW}" || true
           git tag "v${NEW}"
           git push origin HEAD:development --follow-tags
@@ -229,6 +231,7 @@ jobs:
           cd -
 
           git add apps/backend/package.json apps/backend/package-lock.json || true
+          git add apps/frontend/package.json apps/frontend/package-lock.json || true
           git commit -m "chore(rc): v${NEW}" || true
           git tag "v${NEW}"
           git push origin HEAD:recette --follow-tags
