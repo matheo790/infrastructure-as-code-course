@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: backend-app
+    ports:
+      - "3000:3000"  
+    environment:
+      - NODE_ENV=development
+      - URL=http://backend-app:3000
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run dev
+networks:
+  backend-frontend-network:
+    driver: bridge
