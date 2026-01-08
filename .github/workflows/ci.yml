@@ -158,7 +158,6 @@ jobs:
 
           git push origin HEAD:main --follow-tags
 
-      # ---- DEV: snapshot tags based on latest stable vX.Y.Z ----
       - name: 🧪 Snapshot on development (X.Y.Z-snapshot.N)
         if: github.ref_name == 'development'
         shell: bash
