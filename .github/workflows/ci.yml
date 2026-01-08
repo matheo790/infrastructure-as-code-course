@@ -145,7 +145,6 @@ jobs:
           git remote -v
           git fetch origin --force --prune --tags
 
-      # ---- MAIN: true releases via npm version patch|minor|major ----
       - name: 🚀 Release on main (npm version)
         if: github.ref_name == 'main'
         run: |
