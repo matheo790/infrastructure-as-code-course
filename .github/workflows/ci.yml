@@ -171,7 +171,8 @@ jobs:
           cd -
 
           # ✅ push du commit + tags créés par npm version
-          git push origin HEAD:main --follow-tags
+          git push origin HEAD:main
+
 
           echo "Created tag: v${NEW_VER}"
 
