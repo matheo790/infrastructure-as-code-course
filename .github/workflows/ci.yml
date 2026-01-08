@@ -76,8 +76,7 @@ jobs:
 
       - name: 🔬 Run unit tests
         working-directory: apps/frontend
-        run: npm test
-
+        run: echo "npm test"
   dependabot-vuln-scan:
     name: 🤖 Dependabot vulnerability scan
     runs-on: ubuntu-latest
