@@ -3,7 +3,6 @@ name: CI
 permissions:
   contents: write
   security-events: read
-
 on:
   push:
     branches: [main, development, staging]
@@ -64,7 +63,7 @@ jobs:
         working-directory: apps/frontend
         run: npm test
         run: echo "npm test"
-
+        
   audit:
     name: 🔐 NPM Audit (always)
     runs-on: ubuntu-latest
