@@ -3,7 +3,6 @@ name: CI
 permissions:
   contents: write
   security-events: read
-
 on:
   push:
     branches: [main, development, staging]
@@ -56,6 +55,7 @@ jobs:
         working-directory: apps/frontend
         run: npm ci --legacy-peer-deps
 
+
       - name: 🧑‍🎨 Lint
         working-directory: apps/frontend
         run: npm run lint
@@ -95,6 +95,7 @@ jobs:
     if: github.event_name != 'pull_request'
     outputs:
       tag: ${{ steps.out.outputs.tag }}
+
     steps:
       - name: ✨ Checkout (full + tags)
         uses: actions/checkout@v4
