@@ -86,7 +86,7 @@ jobs:
           git tag "v$NEW_VER"
           git push origin HEAD:main --follow-tags
 
-      # 🧪 DEVELOPMENT: Snapshot version (1.0.0-snapshot.1)
+            # 🧪 DEVELOPMENT: Snapshot version (1.0.0-snapshot.1)
       - name: Snapshot on development
         if: github.ref_name == 'development'
         run: |
@@ -96,13 +96,16 @@ jobs:
           if [ -z "$LAST_SNAP" ]; then N=1; else N=$(echo $LAST_SNAP | grep -o '[0-9]*$'); N=$((N+1)); fi
           NEW="${BASE}-snapshot.${N}"
           
-          cd apps/backend && npm version $NEW --no-git-tag-version && cd -
-          cd apps/frontend && npm version $NEW --no-git-tag-version && cd -
+          # Bump versions
+          (cd apps/backend && npm version $NEW --no-git-tag-version 2>/dev/null || true)
+          (cd apps/frontend && npm version $NEW --no-git-tag-version 2>/dev/null || true)
+          
+          # Commit & tag
           git add apps/backend/package.json apps/backend/package-lock.json apps/frontend/package.json apps/frontend/package-lock.json
           git commit -m "chore(snapshot): v$NEW" || true
           git tag "v$NEW"
           git push origin HEAD:development --follow-tags
-
+          
       # 🧷 STAGING: RC version (1.0.0-RC.1)
       - name: RC on staging
         if: github.ref_name == 'staging'
