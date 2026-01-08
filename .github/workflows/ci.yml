@@ -320,4 +320,7 @@ jobs:
       - name: 🏷️ Tag & Push latest (main only)
         if: github.ref_name == 'main'
         run: |
-            docker tag cmatheo.azurecr.io/backend:${{ steps.vars.outputs.tag }} cmatheo.azurecr.io/backend:latest
+          docker tag cmatheo.azurecr.io/backend:${{ steps.vars.outputs.tag }} cmatheo.azurecr.io/backend:latest
+          docker push cmatheo.azurecr.io/backend:latest
+          
+          
