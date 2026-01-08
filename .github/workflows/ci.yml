@@ -119,22 +119,21 @@ jobs:
       - name: 🚀 Main release (npm version + tag)
         if: github.ref_name == 'main'
         shell: bash
+        env:
+          RELEASE_TYPE: ${{ github.event_name == 'workflow_dispatch' && inputs.release_type || 'patch' }}
         run: |
           set -euo pipefail
           cd apps/backend
 
-          # Choix: patch/minor/major (workflow_dispatch) sinon patch (push normal)
-          RELEASE_TYPE="${{ inputs.release_type }}"
-          if [ -z "${RELEASE_TYPE:-}" ]; then
-            RELEASE_TYPE="patch"
-          fi
+          echo "Event: $GITHUB_EVENT_NAME"
+          echo "Branch: $GITHUB_REF_NAME"
+          echo "Release type: $RELEASE_TYPE"
 
-          # npm fait tout: bump + commit + tag vX.Y.Z
           npm ci
           npm version "$RELEASE_TYPE"
 
           cd -
-          git push origin main --tags
+          git push origin main --follow-tags
 
       # -----------------------------
       # DEVELOPMENT: vX.Y.Z-snapshot.N
