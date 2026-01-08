@@ -241,12 +241,21 @@ jobs:
           fi
           echo "Creating tag: v${NEW}"
 
+          # 📝 Bump version dans BACKEND
           cd apps/backend
           npm version "${NEW}" --no-git-tag-version
           cd -
 
-          git add apps/backend/package.json apps/backend/package-lock.json || true
-          git add apps/frontend/package.json apps/frontend/package-lock.json || true
+          # 📝 Bump version dans FRONTEND
+          cd apps/frontend
+          npm version "${NEW}" --no-git-tag-version
+          cd -
+
+          # 📦 Ajouter les 4 fichiers modifiés
+          git add apps/backend/package.json apps/backend/package-lock.json
+          git add apps/frontend/package.json apps/frontend/package-lock.json
+
+          # ✅ Commit + Tag
           git commit -m "chore(rc): v${NEW}" || true
           git tag "v${NEW}"
           git push origin HEAD:staging --follow-tags
