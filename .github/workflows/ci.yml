@@ -3,6 +3,7 @@ name: CI
 permissions:
   contents: write
   security-events: read
+
 on:
   push:
     branches: [main, development, staging]
@@ -10,26 +11,33 @@ on:
   workflow_dispatch:
     inputs:
       release_type:
-        description: "Release type (main only)"
+        description: "Release type (main only): patch | minor | major"
         required: true
-        default: patch
+        default: "patch"
         type: choice
         options: [patch, minor, major]
   schedule:
-    - cron: "0 3 * * 0"
+    - cron: '0 3 * * 0'
 
 jobs:
   backend-test:
-    name: ⚙️ Backend (lint + tests)
+    name: ⚙️ Backend unit tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: ✨ Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: 🟩 Install
+      - name: ⬆️ Upgrade npm (fix rollup optional deps)
+        run: |
+          npm i -g npm@11.3.0
+          npm -v
+
+      - name: 🟩 Install dependencies
         working-directory: apps/backend
         run: npm ci
 
@@ -37,21 +45,28 @@ jobs:
         working-directory: apps/backend
         run: npm run lint
 
-      - name: 🔬 Tests
+      - name: 🔬 Run unit tests
         working-directory: apps/backend
         run: npm test
 
   frontend-test:
-    name: 🖥️ Frontend (lint + tests)
+    name: 🖥️ Frontend tests (lint + unit tests)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: ✨ Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: 🟩 Install
+      - name: ⬆️ Upgrade npm (fix rollup optional deps)
+        run: |
+          npm i -g npm@11.3.0
+          npm -v
+
+      - name: 🟩 Install dependencies
         working-directory: apps/frontend
         run: npm ci --legacy-peer-deps
 
@@ -59,205 +74,313 @@ jobs:
         working-directory: apps/frontend
         run: npm run lint
 
-      - name: 🔬 Tests
+      - name: 🔬 Run unit tests
         working-directory: apps/frontend
         run: echo "npm test"
 
-  audit:
-    name: 🔐 NPM Audit (always)
+  dependabot-vuln-scan:
+    name: 🤖 Dependabot vulnerability scan
     runs-on: ubuntu-latest
     needs: [backend-test, frontend-test]
     if: always()
     steps:
-      - uses: actions/checkout@v4
+      - name: ✨ Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: 🔐 Audit backend
+      - name: ⬆️ Upgrade npm (fix rollup optional deps)
+        run: |
+          npm i -g npm@11.3.0
+          npm -v
+
+      - name: 🔐 Run npm audit (backend)
         working-directory: apps/backend
         run: |
-          npm ci
+          npm ci --legacy-peer-deps
           npm audit --audit-level=moderate
 
-      - name: 🔐 Audit frontend
+      - name: 🔐 Run npm audit (frontend)
         working-directory: apps/frontend
         run: |
           npm ci --legacy-peer-deps
           npm audit --audit-level=moderate
 
   versioning:
-    name: 🏷️ Create version tag
+    name: 🏷️ Versioning (main / snapshot / RC)
     runs-on: ubuntu-latest
-    needs: [backend-test, frontend-test, audit]
+    needs: [backend-test, frontend-test, dependabot-vuln-scan]
     if: github.event_name != 'pull_request'
+    permissions:
+      contents: write
     outputs:
       tag: ${{ steps.out.outputs.tag }}
+
     steps:
-      - name: ✨ Checkout (full + tags)
+      - name: ✨ Checkout full history + tags
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: true
 
-      - uses: actions/setup-node@v4
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - name: 🔧 Git identity
+      - name: ⬆️ Upgrade npm
         run: |
-          git config user.name  "github-actions[bot]"
+          npm i -g npm@11.3.0
+          npm -v
+
+      - name: 🔧 Configure Git identity
+        run: |
+          git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: 🏷️ Fetch tags
-        run: git fetch --force --tags
+      - name: 🏷️ Fetch tags (robust)
+        shell: bash
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git fetch origin --force --prune --tags
 
-      # -----------------------------
-      # MAIN: vX.Y.Z (patch/minor/major)
-      # -----------------------------
-      - name: 🚀 Main release (npm version + tag)
-        if: github.ref_name == 'main'
+      # ✅ MAIN: release automatique
+      - name: 🚀 Release on main (bump package.json + tag)
+        if: github.ref_name == 'main' && github.actor != 'github-actions[bot]'
         shell: bash
         run: |
           set -euo pipefail
-          cd apps/backend
 
-          # Choix: patch/minor/major (workflow_dispatch) sinon patch (push normal)
-          RELEASE_TYPE="${{ inputs.release_type }}"
-          if [ -z "${RELEASE_TYPE:-}" ]; then
-            RELEASE_TYPE="patch"
+          TYPE="${{ github.event.inputs.release_type || 'patch' }}"
+          echo "Release type: $TYPE"
+
+          # 1) Bump version SANS commit auto
+          cd apps/backend
+          npm version "$TYPE" --no-git-tag-version
+          NEW_VER="$(node -p "require('./package.json').version")"
+          cd -
+
+          echo "New version = v${NEW_VER}"
+
+          # 2) Commit package.json + package-lock.json
+          git add apps/backend/package.json apps/backend/package-lock.json
+          git add apps/frontend/package.json apps/frontend/package-lock.json
+
+          if git diff --cached --quiet; then
+            echo "❌ package.json n'a pas changé — abort"
+            exit 1
           fi
 
-          # npm fait tout: bump + commit + tag vX.Y.Z
-          npm ci
-          npm version "$RELEASE_TYPE"
+          git commit -m "chore(release): v${NEW_VER}"
 
-          cd -
-          git push origin main --tags
+          # 3) Créer le tag
+          git tag "v${NEW_VER}"
 
-      # -----------------------------
-      # DEVELOPMENT: vX.Y.Z-snapshot.N
-      # -----------------------------
-      - name: 🧪 Development snapshot tag
+          # 4) Push commit + tag séparément
+          git push origin HEAD:main
+          git push origin "v${NEW_VER}"
+
+      # ✅ DEVELOPMENT: snapshots
+      - name: 🧪 Snapshot on development (X.Y.Z-snapshot.N)
         if: github.ref_name == 'development'
         shell: bash
         run: |
           set -euo pipefail
+          git fetch origin --force --prune --tags
 
+          # Cherche la dernière version stable
           STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
-          BASE="${STABLE#v}"
-          [ -z "${BASE:-}" ] && BASE="1.0.0"
+          BASE="${STABLE#v}"; [ -z "${BASE:-}" ] && BASE="1.0.0"
 
-          LAST=$(git tag --sort=-v:refname | grep -E "^v${BASE}-snapshot\.[0-9]+$" | head -n 1 || true)
-          if [ -z "${LAST:-}" ]; then N=1; else
-            N=$(echo "$LAST" | sed -E "s/^v${BASE}-snapshot\.([0-9]+)$/\1/")
-            N=$((N+1))
-          fi
-
+          # Cherche le snapshot existant pour cette base
+          LAST_SNAP=$(git tag --sort=-v:refname | grep -E "^v${BASE}-snapshot\.[0-9]+$" | head -n 1 || true)
+          if [ -z "${LAST_SNAP:-}" ]; then N=1; else N=$(( ${LAST_SNAP##*.} + 1 )); fi
           NEW="${BASE}-snapshot.${N}"
 
+          echo "Creating tag: v${NEW}"
+
+          # 📝 Bump version dans BACKEND
           cd apps/backend
-          npm ci
           npm version "${NEW}" --no-git-tag-version
           cd -
 
-          git add apps/backend/package.json apps/backend/package-lock.json
-          git commit -m "chore(snapshot): v${NEW}" || true
-          git tag "v${NEW}"
-          git push origin HEAD:development --tags
+          # 📝 Bump version dans FRONTEND
+          cd apps/frontend
+          npm version "${NEW}" --no-git-tag-version
+          cd -
 
-      # -----------------------------
-      # STAGING: vX.Y.Z-RC.N
-      # -----------------------------
-      - name: 🧷 Staging RC tag
+          # 📦 Ajouter les 4 fichiers modifiés
+          git add apps/backend/package.json apps/backend/package-lock.json
+          git add apps/frontend/package.json apps/frontend/package-lock.json
+
+          # ✅ Commit
+          git commit -m "chore(snapshot): v${NEW}" || true
+
+          # 📌 Créer le tag
+          git tag "v${NEW}"
+
+          # 🚀 Push commit + tag séparément
+          git push origin HEAD:development
+          git push origin "v${NEW}"
+
+        # ✅ STAGING: RC tags
+      - name: 🧷 RC on staging (X.Y.Z-RC.N)
         if: github.ref_name == 'staging'
         shell: bash
         run: |
           set -euo pipefail
+          git fetch origin --force --prune --tags
 
-          STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
-          BASE="${STABLE#v}"
-          [ -z "${BASE:-}" ] && BASE="1.0.0"
+          # Cherche la PLUS HAUTE version (stable + snapshot)
+          LAST_VERSION=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | grep -v -E '(-RC|-snapshot)' | head -n 1 || true)
+          
+          # Ou cherche le snapshot le plus récent si pas de stable
+          if [ -z "${LAST_VERSION:-}" ]; then
+            LAST_VERSION=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-snapshot\.[0-9]+)?$' | head -n 1 || true)
+          fi
+          
+          BASE="${LAST_VERSION#v}"; [ -z "${BASE:-}" ] && BASE="1.0.0"
+          # Nettoie le suffixe snapshot si présent
+          BASE="${BASE%-snapshot*}"
 
-          LAST=$(git tag --sort=-v:refname | grep -E "^v${BASE}-RC\.[0-9]+$" | head -n 1 || true)
-          if [ -z "${LAST:-}" ]; then N=1; else
-            N=$(echo "$LAST" | sed -E "s/^v${BASE}-RC\.([0-9]+)$/\1/")
-            N=$((N+1))
+          # Cherche les RC existants pour CETTE base
+          LAST_RC=$(git tag --sort=-v:refname | grep -E "^v${BASE}-RC\.[0-9]+$" | head -n 1 || true)
+          
+          if [ -z "${LAST_RC:-}" ]; then
+            NEW="${BASE}-RC.1"
+          else
+            N_RC="${LAST_RC##*-RC.}"
+            NEW="${BASE}-RC.$((N_RC + 1))"
           fi
 
-          NEW="${BASE}-RC.${N}"
+          echo "Creating tag: v${NEW}"
 
+          # 📝 Bump version dans BACKEND (avec gestion d'erreur)
           cd apps/backend
-          npm ci
-          npm version "${NEW}" --no-git-tag-version
+          CURRENT_VER=$(node -p "require('./package.json').version")
+          if [ "${CURRENT_VER}" != "${NEW}" ]; then
+            npm version "${NEW}" --no-git-tag-version
+          else
+            echo "⚠️ Version already ${NEW} in backend, skipping npm version"
+          fi
           cd -
 
-          git add apps/backend/package.json apps/backend/package-lock.json
-          git commit -m "chore(rc): v${NEW}" || true
-          git tag "v${NEW}"
-          git push origin HEAD:staging --tags
+          # 📝 Bump version dans FRONTEND (avec gestion d'erreur)
+          cd apps/frontend
+          CURRENT_VER=$(node -p "require('./package.json').version")
+          if [ "${CURRENT_VER}" != "${NEW}" ]; then
+            npm version "${NEW}" --no-git-tag-version
+          else
+            echo "⚠️ Version already ${NEW} in frontend, skipping npm version"
+          fi
+          cd -
 
-      - name: 📌 Output tag (latest tag)
+          # 📦 Ajouter les 4 fichiers modifiés
+          git add apps/backend/package.json apps/backend/package-lock.json || true
+          git add apps/frontend/package.json apps/frontend/package-lock.json || true
+
+          # ✅ Commit (ne fait un commit que s'il y a des changements)
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(rc): v${NEW}"
+          else
+            echo "⚠️ No changes to commit"
+          fi
+
+          # 📌 Créer le tag (même s'il existe déjà, pas grave)
+          git tag "v${NEW}" --force
+
+          # 🚀 Push commit + tag séparément
+          git push origin HEAD:staging || true
+          git push origin "v${NEW}" --force || true
+      # ✅ Output tag fiable
+      - name: 📌 Output tag
         id: out
         shell: bash
         run: |
-          git fetch --force --tags
-          TAG=$(git tag --sort=-creatordate | head -n 1)
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          git fetch origin --force --prune --tags
+          # Tag pointant sur HEAD si possible
+          TAG="$(git tag --points-at HEAD | head -n 1 || true)"
+          if [ -z "${TAG:-}" ]; then
+            TAG="$(git tag --sort=-creatordate | head -n 1)"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Output tag = $TAG"
 
-  docker-backend:
-    name: 🐳 Docker backend → ACR
+  docker-build-push-acr-frontend:
+    name: 🐳 Build & Push Docker image to ACR (frontend)
     runs-on: ubuntu-latest
-    needs: [versioning]
+    needs: [frontend-test, dependabot-vuln-scan, versioning]
     if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development' || github.ref_name == 'staging')
     steps:
-      - uses: actions/checkout@v4
+      - name: ✨ Checkout
+        uses: actions/checkout@v4
 
-      - name: 🔐 Login ACR
+      - name: 🏷️ Set Docker tag (use version tag)
+        id: vars
+        run: |
+          echo "tag=${{ needs.versioning.outputs.tag }}" >> $GITHUB_OUTPUT
+
+      - name: 🔐 Login to ACR
         uses: azure/docker-login@v1
         with:
           login-server: cmatheo.azurecr.io
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: 🏷️ Build + Push backend
+      - name: 🏗️ Build frontend image
         run: |
-          TAG="${{ needs.versioning.outputs.tag }}"
-          docker build -t cmatheo.azurecr.io/backend:${TAG} apps/backend
-          docker push cmatheo.azurecr.io/backend:${TAG}
+          docker build \
+            -t cmatheo.azurecr.io/frontend:${{ steps.vars.outputs.tag }} \
+            apps/frontend
 
-      - name: 🏷️ Push latest (main only)
+      - name: 🚀 Push frontend image
+        run: |
+          docker push cmatheo.azurecr.io/frontend:${{ steps.vars.outputs.tag }}
+
+      - name: 🏷️ Tag & Push latest (main only)
         if: github.ref_name == 'main'
         run: |
-          TAG="${{ needs.versioning.outputs.tag }}"
-          docker tag cmatheo.azurecr.io/backend:${TAG} cmatheo.azurecr.io/backend:latest
-          docker push cmatheo.azurecr.io/backend:latest
+          docker tag cmatheo.azurecr.io/frontend:${{ steps.vars.outputs.tag }} cmatheo.azurecr.io/frontend:latest
+          docker push cmatheo.azurecr.io/frontend:latest
 
-  docker-frontend:
-    name: 🐳 Docker frontend → ACR
+  docker-build-push-acr-backend:
+    name: 🐳 Build & Push Docker image to ACR (backend)
     runs-on: ubuntu-latest
-    needs: [versioning]
+    needs: [backend-test, dependabot-vuln-scan, versioning]
     if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development' || github.ref_name == 'staging')
     steps:
-      - uses: actions/checkout@v4
+      - name: ✨ Checkout
+        uses: actions/checkout@v4
 
-      - name: 🔐 Login ACR
+      - name: 🏷️ Set Docker tag (use version tag)
+        id: vars
+        run: |
+          echo "tag=${{ needs.versioning.outputs.tag }}" >> $GITHUB_OUTPUT
+
+      - name: 🔐 Login to ACR
         uses: azure/docker-login@v1
         with:
           login-server: cmatheo.azurecr.io
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: 🏷️ Build + Push frontend
+      - name: 🏗️ Build backend image
         run: |
-          TAG="${{ needs.versioning.outputs.tag }}"
-          docker build -t cmatheo.azurecr.io/frontend:${TAG} apps/frontend
-          docker push cmatheo.azurecr.io/frontend:${TAG}
+          docker build \
+            -t cmatheo.azurecr.io/backend:${{ steps.vars.outputs.tag }} \
+            apps/backend
 
-      - name: 🏷️ Push latest (main only)
+      - name: 🚀 Push backend image
+        run: |
+          docker push cmatheo.azurecr.io/backend:${{ steps.vars.outputs.tag }}
+
+      - name: 🏷️ Tag & Push latest (main only)
         if: github.ref_name == 'main'
         run: |
-          TAG="${{ needs.versioning.outputs.tag }}"
-          docker tag cmatheo.azurecr.io/frontend:${TAG} cmatheo.azurecr.io/frontend:latest
+          docker tag cmatheo.azurecr.io/backend:${{ steps.vars.outputs.tag }} cmatheo.azurecr.io/backend:latest
           docker push cmatheo.azurecr.io/backend:latest
-
+          
