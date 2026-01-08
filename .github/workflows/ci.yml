@@ -6,7 +6,7 @@ permissions:
 
 on:
   push:
-    branches: [main, development, recette]
+    branches: [main, development, staging]
   pull_request: {}
   workflow_dispatch:
     inputs:
