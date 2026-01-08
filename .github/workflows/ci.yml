@@ -109,133 +109,133 @@ jobs:
           npm audit --audit-level=moderate
 
   versioning:
-  name: 🏷️ Versioning (main / snapshot / RC)
-  runs-on: ubuntu-latest
-  needs: [backend-test, frontend-test, dependabot-vuln-scan]
-  if: github.event_name != 'pull_request'
-  permissions:
-    contents: write
-  outputs:
-    tag: ${{ steps.out.outputs.tag }}
+    name: 🏷️ Versioning (main / snapshot / RC)
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-test, dependabot-vuln-scan]
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.out.outputs.tag }}
 
-  steps:
-    - name: ✨ Checkout full history + tags
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        fetch-tags: true
-        persist-credentials: true
+    steps:
+      - name: ✨ Checkout full history + tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: true
 
-    - name: 📦 Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: "20"
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
 
-    - name: ⬆️ Upgrade npm
-      run: |
-        npm i -g npm@11.3.0
-        npm -v
+      - name: ⬆️ Upgrade npm
+        run: |
+          npm i -g npm@11.3.0
+          npm -v
 
-    - name: 🔧 Configure Git identity
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: 🔧 Configure Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-    - name: 🏷️ Fetch tags (robust)
-      shell: bash
-      run: |
-        git config --global --add safe.directory "$GITHUB_WORKSPACE"
-        git fetch origin --force --prune --tags
+      - name: 🏷️ Fetch tags (robust)
+        shell: bash
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git fetch origin --force --prune --tags
 
-    # ✅ MAIN: release automatique qui marche (pas de boucle, tag fiable)
-    - name: 🚀 Release on main (npm version -> tag)
-      if: github.ref_name == 'main' && github.actor != 'github-actions[bot]'
-      shell: bash
-      run: |
-        set -euo pipefail
+      # ✅ MAIN: release automatique qui marche (pas de boucle, tag fiable)
+      - name: 🚀 Release on main (npm version -> tag)
+        if: github.ref_name == 'main' && github.actor != 'github-actions[bot]'
+        shell: bash
+        run: |
+          set -euo pipefail
 
-        # Anti-boucle : si le dernier commit est déjà une release, on ne refait pas
-        LAST_MSG="$(git log -1 --pretty=%s)"
-        if echo "$LAST_MSG" | grep -qE '^chore\(release\):'; then
-          echo "Already a release commit, skipping."
-          exit 0
-        fi
+          # Anti-boucle : si le dernier commit est déjà une release, on ne refait pas
+          LAST_MSG="$(git log -1 --pretty=%s)"
+          if echo "$LAST_MSG" | grep -qE '^chore\(release\):'; then
+            echo "Already a release commit, skipping."
+            exit 0
+          fi
 
-        TYPE="${{ github.event.inputs.release_type || 'patch' }}"
-        echo "Release type: $TYPE"
+          TYPE="${{ github.event.inputs.release_type || 'patch' }}"
+          echo "Release type: $TYPE"
 
-        cd apps/backend
-        npm ci
-        npm version "$TYPE" -m "chore(release): %s"
-        NEW_VER="$(node -p "require('./package.json').version")"
-        cd -
+          cd apps/backend
+          npm ci
+          npm version "$TYPE" -m "chore(release): %s"
+          NEW_VER="$(node -p "require('./package.json').version")"
+          cd -
 
-        # ✅ push du commit + tags créés par npm version
-        git push origin HEAD:main --follow-tags
+          # ✅ push du commit + tags créés par npm version
+          git push origin HEAD:main --follow-tags
 
-        echo "Created tag: v${NEW_VER}"
+          echo "Created tag: v${NEW_VER}"
 
-    # ---- DEV: snapshot tags (tu peux laisser tel quel) ----
-    - name: 🧪 Snapshot on development (X.Y.Z-snapshot.N)
-      if: github.ref_name == 'development'
-      shell: bash
-      run: |
-        set -euo pipefail
-        git fetch origin --force --prune --tags
+      # ---- DEV: snapshot tags (tu peux laisser tel quel) ----
+      - name: 🧪 Snapshot on development (X.Y.Z-snapshot.N)
+        if: github.ref_name == 'development'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin --force --prune --tags
 
-        STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
-        BASE="${STABLE#v}"; [ -z "${BASE:-}" ] && BASE="1.0.0"
+          STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+          BASE="${STABLE#v}"; [ -z "${BASE:-}" ] && BASE="1.0.0"
 
-        LAST_SNAP=$(git tag --sort=-v:refname | grep -E "^v${BASE}-snapshot\.[0-9]+$" | head -n 1 || true)
-        if [ -z "${LAST_SNAP:-}" ]; then N=1; else N=$(( ${LAST_SNAP##*.} + 1 )); fi
-        NEW="${BASE}-snapshot.${N}"
+          LAST_SNAP=$(git tag --sort=-v:refname | grep -E "^v${BASE}-snapshot\.[0-9]+$" | head -n 1 || true)
+          if [ -z "${LAST_SNAP:-}" ]; then N=1; else N=$(( ${LAST_SNAP##*.} + 1 )); fi
+          NEW="${BASE}-snapshot.${N}"
 
-        cd apps/backend
-        npm version "${NEW}" --no-git-tag-version
-        cd -
+          cd apps/backend
+          npm version "${NEW}" --no-git-tag-version
+          cd -
 
-        git add apps/backend/package.json apps/backend/package-lock.json || true
-        git commit -m "chore(snapshot): v${NEW}" || true
-        git tag "v${NEW}"
-        git push origin HEAD:development --follow-tags
+          git add apps/backend/package.json apps/backend/package-lock.json || true
+          git commit -m "chore(snapshot): v${NEW}" || true
+          git tag "v${NEW}"
+          git push origin HEAD:development --follow-tags
 
-    # ---- RECETTE: RC tags (tu peux laisser tel quel) ----
-    - name: 🧷 RC on recette (X.Y.Z-RC.N)
-      if: github.ref_name == 'recette'
-      shell: bash
-      run: |
-        set -euo pipefail
-        git fetch origin --force --prune --tags
+      # ---- RECETTE: RC tags (tu peux laisser tel quel) ----
+      - name: 🧷 RC on recette (X.Y.Z-RC.N)
+        if: github.ref_name == 'recette'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin --force --prune --tags
 
-        STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
-        BASE="${STABLE#v}"; [ -z "${BASE:-}" ] && BASE="1.0.0"
+          STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+          BASE="${STABLE#v}"; [ -z "${BASE:-}" ] && BASE="1.0.0"
 
-        LAST_RC=$(git tag --sort=-v:refname | grep -E "^v${BASE}-RC\.[0-9]+$" | head -n 1 || true)
-        if [ -z "${LAST_RC:-}" ]; then N=1; else N=$(( ${LAST_RC##*.} + 1 )); fi
-        NEW="${BASE}-RC.${N}"
+          LAST_RC=$(git tag --sort=-v:refname | grep -E "^v${BASE}-RC\.[0-9]+$" | head -n 1 || true)
+          if [ -z "${LAST_RC:-}" ]; then N=1; else N=$(( ${LAST_RC##*.} + 1 )); fi
+          NEW="${BASE}-RC.${N}"
 
-        cd apps/backend
-        npm version "${NEW}" --no-git-tag-version
-        cd -
+          cd apps/backend
+          npm version "${NEW}" --no-git-tag-version
+          cd -
 
-        git add apps/backend/package.json apps/backend/package-lock.json || true
-        git commit -m "chore(rc): v${NEW}" || true
-        git tag "v${NEW}"
-        git push origin HEAD:recette --follow-tags
+          git add apps/backend/package.json apps/backend/package-lock.json || true
+          git commit -m "chore(rc): v${NEW}" || true
+          git tag "v${NEW}"
+          git push origin HEAD:recette --follow-tags
 
-    # ✅ Output tag fiable: prend le tag du dernier commit (celui créé dans ce run)
-    - name: 📌 Output tag
-      id: out
-      shell: bash
-      run: |
-        git fetch origin --force --prune --tags
-        # tag pointant sur HEAD si possible, sinon dernier tag créé
-        TAG="$(git tag --points-at HEAD | head -n 1 || true)"
-        if [ -z "${TAG:-}" ]; then
-          TAG="$(git tag --sort=-creatordate | head -n 1)"
-        fi
-        echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-        echo "Output tag = $TAG"
+      # ✅ Output tag fiable: prend le tag du dernier commit (celui créé dans ce run)
+      - name: 📌 Output tag
+        id: out
+        shell: bash
+        run: |
+          git fetch origin --force --prune --tags
+          # tag pointant sur HEAD si possible, sinon dernier tag créé
+          TAG="$(git tag --points-at HEAD | head -n 1 || true)"
+          if [ -z "${TAG:-}" ]; then
+            TAG="$(git tag --sort=-creatordate | head -n 1)"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Output tag = $TAG"
 
   docker-build-push-acr-frontend:
     name: 🐳 Build & Push Docker image to ACR (frontend)
