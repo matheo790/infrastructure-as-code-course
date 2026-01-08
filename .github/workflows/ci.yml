@@ -185,7 +185,6 @@ jobs:
           git push origin HEAD:main
           git push origin "v${NEW_VER}"
 
-
       - name: 🧪 Snapshot on development (X.Y.Z-snapshot.N)
         if: github.ref_name == 'development'
         shell: bash
@@ -322,5 +321,4 @@ jobs:
         run: |
           docker tag cmatheo.azurecr.io/backend:${{ steps.vars.outputs.tag }} cmatheo.azurecr.io/backend:latest
           docker push cmatheo.azurecr.io/backend:latest
-          
           
