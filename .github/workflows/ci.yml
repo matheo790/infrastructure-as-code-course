@@ -3,7 +3,6 @@ name: CI
 permissions:
   contents: write
   security-events: read
-
 on:
   push:
     branches: [main, development, staging]
@@ -144,17 +143,67 @@ jobs:
           git remote -v
           git fetch origin --force --prune --tags
 
-      - name: 🚀 Release on main (npm version)
+      - name: 🚀 Release on main (bump + tag + push)
         if: github.ref_name == 'main'
+        shell: bash
         run: |
-          TYPE="${{ github.event.inputs.release_type || 'patch' }}"
-          echo "Release type: $TYPE"
+          set -euo pipefail
 
+          # 1) Récupérer tags (important en CI)
+          git fetch --force --tags
+
+          # 2) Config git identity pour pouvoir commit/tag
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # 3) Trouver le dernier tag stable (vX.Y.Z)
+          STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+
+          if [ -z "${STABLE:-}" ]; then
+            BASE="1.0.0"
+          else
+            BASE="${STABLE#v}"
+          fi
+
+          # 4) Calculer NEW à partir de BASE + release_type (patch/minor/major)
+          RELEASE_TYPE="${{ inputs.release_type || 'patch' }}"
+
+          IFS='.' read -r MA MI PA <<< "$BASE"
+          case "$RELEASE_TYPE" in
+            major) MA=$((MA+1)); MI=0; PA=0 ;;
+            minor) MI=$((MI+1)); PA=0 ;;
+            patch) PA=$((PA+1)) ;;
+            *) echo "release_type invalide: $RELEASE_TYPE (major|minor|patch)"; exit 1 ;;
+          esac
+
+          NEW="${MA}.${MI}.${PA}"
+          echo "New release: v${NEW}"
+
+          # 5) Bump version NPM (backend) sans tag auto
           cd apps/backend
-          npm version "$TYPE" -m "chore(release): %s"
+          npm version "${NEW}" --no-git-tag-version
           cd -
 
-          git push origin HEAD:main --follow-tags
+          # 6) Commit + tag + push
+          git add apps/backend/package.json apps/backend/package-lock.json
+
+          # si rien n'a changé (ex: même version), on stoppe proprement
+          if git diff --cached --quiet; then
+            echo "Nothing to commit (version déjà à ${NEW})."
+            exit 0
+          fi
+
+          git commit -m "chore(main): v${NEW}"
+
+          # éviter erreur si tag existe déjà
+          if git rev-parse "v${NEW}" >/dev/null 2>&1; then
+            echo "Tag v${NEW} existe déjà, abort."
+            exit 1
+          fi
+
+          git tag "v${NEW}"
+          git push origin HEAD:main --tags
+
 
       - name: 🧪 Snapshot on development (X.Y.Z-snapshot.N)
         if: github.ref_name == 'development'
@@ -192,20 +241,26 @@ jobs:
           git tag "v${NEW}"
           git push origin HEAD:development --tags
 
-      # ---- RECETTE: RC tags based on latest stable vX.Y.Z ----
-      - name: 🧷 RC on recette (X.Y.Z-RC.N)
-        if: github.ref_name == 'recette'
+
+      - name: 🧷 RC on staging (X.Y.Z-RC.N)
+        if: github.ref_name == 'staging'
         shell: bash
         run: |
-          STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
-          if [ -z "$STABLE" ]; then
+          set -euo pipefail
+
+          # Si aucun tag stable n'existe, grep renvoie 1 -> on neutralise
+          STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+
+          if [ -z "${STABLE:-}" ]; then
             BASE="1.0.0"
           else
             BASE="${STABLE#v}"
           fi
 
-          LAST_RC=$(git tag --sort=-v:refname | grep -E "^v${BASE}-RC\.[0-9]+$" | head -n 1)
-          if [ -z "$LAST_RC" ]; then
+          # Pareil ici: si aucun RC n'existe encore, grep renvoie 1 -> on neutralise
+          LAST_RC=$(git tag --sort=-v:refname | grep -E "^v${BASE}-RC\.[0-9]+$" | head -n 1 || true)
+
+          if [ -z "${LAST_RC:-}" ]; then
             N=1
           else
             N=$(echo "$LAST_RC" | sed -E "s/^v${BASE}-RC\.([0-9]+)$/\1/")
@@ -222,8 +277,7 @@ jobs:
           git add apps/backend/package.json apps/backend/package-lock.json || true
           git commit -m "chore(rc): v${NEW}" || true
           git tag "v${NEW}"
-          git push origin HEAD:recette --tags
-
+          git push origin HEAD:staging --tags
       - name: 📌 Output tag
         id: out
         shell: bash
@@ -236,7 +290,7 @@ jobs:
     name: 🐳 Build & Push Docker image to ACR (frontend)
     runs-on: ubuntu-latest
     needs: [frontend-test, dependabot-vuln-scan, versioning]
-    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development' || github.ref_name == 'recette')
+    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development' || github.ref_name == 'staging')
     steps:
       - name: ✨ Checkout
         uses: actions/checkout@v4
@@ -273,7 +327,7 @@ jobs:
     name: 🐳 Build & Push Docker image to ACR (backend)
     runs-on: ubuntu-latest
     needs: [backend-test, dependabot-vuln-scan, versioning]
-    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development' || github.ref_name == 'recette')
+    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development' || github.ref_name == 'staging')
     steps:
       - name: ✨ Checkout
         uses: actions/checkout@v4
