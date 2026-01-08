@@ -227,7 +227,7 @@ jobs:
           git push origin HEAD:development
           git push origin "v${NEW}"
 
-      # ✅ STAGING: RC tags
+        # ✅ STAGING: RC tags
       - name: 🧷 RC on staging (X.Y.Z-RC.N)
         if: github.ref_name == 'staging'
         shell: bash
@@ -259,30 +259,43 @@ jobs:
 
           echo "Creating tag: v${NEW}"
 
-          # 📝 Bump version dans BACKEND
+          # 📝 Bump version dans BACKEND (avec gestion d'erreur)
           cd apps/backend
-          npm version "${NEW}" --no-git-tag-version
+          CURRENT_VER=$(node -p "require('./package.json').version")
+          if [ "${CURRENT_VER}" != "${NEW}" ]; then
+            npm version "${NEW}" --no-git-tag-version
+          else
+            echo "⚠️ Version already ${NEW} in backend, skipping npm version"
+          fi
           cd -
 
-          # 📝 Bump version dans FRONTEND
+          # 📝 Bump version dans FRONTEND (avec gestion d'erreur)
           cd apps/frontend
-          npm version "${NEW}" --no-git-tag-version
+          CURRENT_VER=$(node -p "require('./package.json').version")
+          if [ "${CURRENT_VER}" != "${NEW}" ]; then
+            npm version "${NEW}" --no-git-tag-version
+          else
+            echo "⚠️ Version already ${NEW} in frontend, skipping npm version"
+          fi
           cd -
 
           # 📦 Ajouter les 4 fichiers modifiés
-          git add apps/backend/package.json apps/backend/package-lock.json
-          git add apps/frontend/package.json apps/frontend/package-lock.json
+          git add apps/backend/package.json apps/backend/package-lock.json || true
+          git add apps/frontend/package.json apps/frontend/package-lock.json || true
 
-          # ✅ Commit
-          git commit -m "chore(rc): v${NEW}" || true
+          # ✅ Commit (ne fait un commit que s'il y a des changements)
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(rc): v${NEW}"
+          else
+            echo "⚠️ No changes to commit"
+          fi
 
-          # 📌 Créer le tag
-          git tag "v${NEW}"
+          # 📌 Créer le tag (même s'il existe déjà, pas grave)
+          git tag "v${NEW}" --force
 
           # 🚀 Push commit + tag séparément
-          git push origin HEAD:staging
-          git push origin "v${NEW}"
-
+          git push origin HEAD:staging || true
+          git push origin "v${NEW}" --force || true
       # ✅ Output tag fiable
       - name: 📌 Output tag
         id: out
