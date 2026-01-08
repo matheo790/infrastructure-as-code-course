@@ -77,6 +77,7 @@ jobs:
       - name: 🔬 Run unit tests
         working-directory: apps/frontend
         run: echo "npm test"
+
   dependabot-vuln-scan:
     name: 🤖 Dependabot vulnerability scan
     runs-on: ubuntu-latest
@@ -147,7 +148,7 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git fetch origin --force --prune --tags
 
-      # ✅ MAIN: release automatique qui marche (pas de boucle, tag fiable)
+      # ✅ MAIN: release automatique
       - name: 🚀 Release on main (bump package.json + tag)
         if: github.ref_name == 'main' && github.actor != 'github-actions[bot]'
         shell: bash
@@ -166,8 +167,6 @@ jobs:
           echo "New version = v${NEW_VER}"
 
           # 2) Commit package.json + package-lock.json
-          git status --short
-
           git add apps/backend/package.json apps/backend/package-lock.json
           git add apps/frontend/package.json apps/frontend/package-lock.json
 
@@ -181,10 +180,11 @@ jobs:
           # 3) Créer le tag
           git tag "v${NEW_VER}"
 
-          # 4) Push commit + tag
+          # 4) Push commit + tag séparément
           git push origin HEAD:main
           git push origin "v${NEW_VER}"
 
+      # ✅ DEVELOPMENT: snapshots
       - name: 🧪 Snapshot on development (X.Y.Z-snapshot.N)
         if: github.ref_name == 'development'
         shell: bash
@@ -192,25 +192,42 @@ jobs:
           set -euo pipefail
           git fetch origin --force --prune --tags
 
+          # Cherche la dernière version stable
           STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
           BASE="${STABLE#v}"; [ -z "${BASE:-}" ] && BASE="1.0.0"
 
+          # Cherche le snapshot existant pour cette base
           LAST_SNAP=$(git tag --sort=-v:refname | grep -E "^v${BASE}-snapshot\.[0-9]+$" | head -n 1 || true)
           if [ -z "${LAST_SNAP:-}" ]; then N=1; else N=$(( ${LAST_SNAP##*.} + 1 )); fi
           NEW="${BASE}-snapshot.${N}"
 
+          echo "Creating tag: v${NEW}"
+
+          # 📝 Bump version dans BACKEND
           cd apps/backend
           npm version "${NEW}" --no-git-tag-version
           cd -
 
-          git add apps/backend/package.json apps/backend/package-lock.json || true
-          git add apps/frontend/package.json apps/frontend/package-lock.json || true
-          git commit -m "chore(snapshot): v${NEW}" || true
-          git tag "v${NEW}"
-          git push origin HEAD:development --follow-tags
+          # 📝 Bump version dans FRONTEND
+          cd apps/frontend
+          npm version "${NEW}" --no-git-tag-version
+          cd -
 
-      # ---- staging: RC tags (tu peux laisser tel quel) ----
-        # ---- staging: RC tags (cherche le plus haut numéro de version) ----
+          # 📦 Ajouter les 4 fichiers modifiés
+          git add apps/backend/package.json apps/backend/package-lock.json
+          git add apps/frontend/package.json apps/frontend/package-lock.json
+
+          # ✅ Commit
+          git commit -m "chore(snapshot): v${NEW}" || true
+
+          # 📌 Créer le tag
+          git tag "v${NEW}"
+
+          # 🚀 Push commit + tag séparément
+          git push origin HEAD:development
+          git push origin "v${NEW}"
+
+      # ✅ STAGING: RC tags
       - name: 🧷 RC on staging (X.Y.Z-RC.N)
         if: github.ref_name == 'staging'
         shell: bash
@@ -239,6 +256,7 @@ jobs:
             N_RC="${LAST_RC##*-RC.}"
             NEW="${BASE}-RC.$((N_RC + 1))"
           fi
+
           echo "Creating tag: v${NEW}"
 
           # 📝 Bump version dans BACKEND
@@ -255,18 +273,23 @@ jobs:
           git add apps/backend/package.json apps/backend/package-lock.json
           git add apps/frontend/package.json apps/frontend/package-lock.json
 
-          # ✅ Commit + Tag
+          # ✅ Commit
           git commit -m "chore(rc): v${NEW}" || true
-          git tag "v${NEW}"
-          git push origin HEAD:staging --follow-tags
 
-      # ✅ Output tag fiable: prend le tag du dernier commit (celui créé dans ce run)
+          # 📌 Créer le tag
+          git tag "v${NEW}"
+
+          # 🚀 Push commit + tag séparément
+          git push origin HEAD:staging
+          git push origin "v${NEW}"
+
+      # ✅ Output tag fiable
       - name: 📌 Output tag
         id: out
         shell: bash
         run: |
           git fetch origin --force --prune --tags
-          # tag pointant sur HEAD si possible, sinon dernier tag créé
+          # Tag pointant sur HEAD si possible
           TAG="$(git tag --points-at HEAD | head -n 1 || true)"
           if [ -z "${TAG:-}" ]; then
             TAG="$(git tag --sort=-creatordate | head -n 1)"
@@ -347,4 +370,3 @@ jobs:
         run: |
           docker tag cmatheo.azurecr.io/backend:${{ steps.vars.outputs.tag }} cmatheo.azurecr.io/backend:latest
           docker push cmatheo.azurecr.io/backend:latest
-  
