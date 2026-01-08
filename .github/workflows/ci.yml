@@ -238,8 +238,7 @@ jobs:
           else
             N_RC="${LAST_RC##*-RC.}"
             NEW="${BASE}-RC.$((N_RC + 1))"
-          fi
-
+          fI
           echo "Creating tag: v${NEW}"
 
           cd apps/backend
