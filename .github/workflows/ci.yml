@@ -191,7 +191,6 @@ jobs:
           git tag "v${NEW}"
           git push origin HEAD:development --tags
       
-      # ---- RECETTE: RC tags based on latest stable vX.Y.Z ----
       - name: 🧷 RC on staging (X.Y.Z-RC.N)
         if: github.ref_name == 'staging'
         shell: bash
