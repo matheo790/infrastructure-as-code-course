@@ -6,7 +6,7 @@ permissions:
 
 on:
   push:
-    branches: [main, development, recette]
+    branches: [main, development, staging]
   pull_request: {}
   workflow_dispatch:
     inputs:
@@ -77,6 +77,7 @@ jobs:
       - name: 🔬 Run unit tests
         working-directory: apps/frontend
         run: echo "npm test"
+
   dependabot-vuln-scan:
     name: 🤖 Dependabot vulnerability scan
     runs-on: ubuntu-latest
@@ -147,7 +148,7 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git fetch origin --force --prune --tags
 
-      # ✅ MAIN: release automatique qui marche (pas de boucle, tag fiable)
+      # ✅ MAIN: release automatique
       - name: 🚀 Release on main (bump package.json + tag)
         if: github.ref_name == 'main' && github.actor != 'github-actions[bot]'
         shell: bash
@@ -166,8 +167,6 @@ jobs:
           echo "New version = v${NEW_VER}"
 
           # 2) Commit package.json + package-lock.json
-          git status --short
-
           git add apps/backend/package.json apps/backend/package-lock.json
           git add apps/frontend/package.json apps/frontend/package-lock.json
 
@@ -181,12 +180,11 @@ jobs:
           # 3) Créer le tag
           git tag "v${NEW_VER}"
 
-          # 4) Push commit + tag
+          # 4) Push commit + tag séparément
           git push origin HEAD:main
           git push origin "v${NEW_VER}"
 
-
-      # ---- DEV: snapshot tags (tu peux laisser tel quel) ----
+      # ✅ DEVELOPMENT: snapshots
       - name: 🧪 Snapshot on development (X.Y.Z-snapshot.N)
         if: github.ref_name == 'development'
         shell: bash
@@ -194,55 +192,117 @@ jobs:
           set -euo pipefail
           git fetch origin --force --prune --tags
 
+          # Cherche la dernière version stable
           STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
           BASE="${STABLE#v}"; [ -z "${BASE:-}" ] && BASE="1.0.0"
 
+          # Cherche le snapshot existant pour cette base
           LAST_SNAP=$(git tag --sort=-v:refname | grep -E "^v${BASE}-snapshot\.[0-9]+$" | head -n 1 || true)
           if [ -z "${LAST_SNAP:-}" ]; then N=1; else N=$(( ${LAST_SNAP##*.} + 1 )); fi
           NEW="${BASE}-snapshot.${N}"
 
+          echo "Creating tag: v${NEW}"
+
+          # 📝 Bump version dans BACKEND
           cd apps/backend
           npm version "${NEW}" --no-git-tag-version
           cd -
 
-          git add apps/backend/package.json apps/backend/package-lock.json || true
-          git add apps/frontend/package.json apps/frontend/package-lock.json || true
-          git commit -m "chore(snapshot): v${NEW}" || true
-          git tag "v${NEW}"
-          git push origin HEAD:development --follow-tags
+          # 📝 Bump version dans FRONTEND
+          cd apps/frontend
+          npm version "${NEW}" --no-git-tag-version
+          cd -
 
-      # ---- RECETTE: RC tags (tu peux laisser tel quel) ----
-      - name: 🧷 RC on recette (X.Y.Z-RC.N)
-        if: github.ref_name == 'recette'
+          # 📦 Ajouter les 4 fichiers modifiés
+          git add apps/backend/package.json apps/backend/package-lock.json
+          git add apps/frontend/package.json apps/frontend/package-lock.json
+
+          # ✅ Commit
+          git commit -m "chore(snapshot): v${NEW}" || true
+
+          # 📌 Créer le tag
+          git tag "v${NEW}"
+
+          # 🚀 Push commit + tag séparément
+          git push origin HEAD:development
+          git push origin "v${NEW}"
+
+        # ✅ STAGING: RC tags
+      - name: 🧷 RC on staging (X.Y.Z-RC.N)
+        if: github.ref_name == 'staging'
         shell: bash
         run: |
           set -euo pipefail
           git fetch origin --force --prune --tags
 
-          STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
-          BASE="${STABLE#v}"; [ -z "${BASE:-}" ] && BASE="1.0.0"
+          # Cherche la PLUS HAUTE version (stable + snapshot)
+          LAST_VERSION=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | grep -v -E '(-RC|-snapshot)' | head -n 1 || true)
+          
+          # Ou cherche le snapshot le plus récent si pas de stable
+          if [ -z "${LAST_VERSION:-}" ]; then
+            LAST_VERSION=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-snapshot\.[0-9]+)?$' | head -n 1 || true)
+          fi
+          
+          BASE="${LAST_VERSION#v}"; [ -z "${BASE:-}" ] && BASE="1.0.0"
+          # Nettoie le suffixe snapshot si présent
+          BASE="${BASE%-snapshot*}"
 
+          # Cherche les RC existants pour CETTE base
           LAST_RC=$(git tag --sort=-v:refname | grep -E "^v${BASE}-RC\.[0-9]+$" | head -n 1 || true)
-          if [ -z "${LAST_RC:-}" ]; then N=1; else N=$(( ${LAST_RC##*.} + 1 )); fi
-          NEW="${BASE}-RC.${N}"
+          
+          if [ -z "${LAST_RC:-}" ]; then
+            NEW="${BASE}-RC.1"
+          else
+            N_RC="${LAST_RC##*-RC.}"
+            NEW="${BASE}-RC.$((N_RC + 1))"
+          fi
 
+          echo "Creating tag: v${NEW}"
+
+          # 📝 Bump version dans BACKEND (avec gestion d'erreur)
           cd apps/backend
-          npm version "${NEW}" --no-git-tag-version
+          CURRENT_VER=$(node -p "require('./package.json').version")
+          if [ "${CURRENT_VER}" != "${NEW}" ]; then
+            npm version "${NEW}" --no-git-tag-version
+          else
+            echo "⚠️ Version already ${NEW} in backend, skipping npm version"
+          fi
           cd -
 
+          # 📝 Bump version dans FRONTEND (avec gestion d'erreur)
+          cd apps/frontend
+          CURRENT_VER=$(node -p "require('./package.json').version")
+          if [ "${CURRENT_VER}" != "${NEW}" ]; then
+            npm version "${NEW}" --no-git-tag-version
+          else
+            echo "⚠️ Version already ${NEW} in frontend, skipping npm version"
+          fi
+          cd -
+
+          # 📦 Ajouter les 4 fichiers modifiés
           git add apps/backend/package.json apps/backend/package-lock.json || true
           git add apps/frontend/package.json apps/frontend/package-lock.json || true
-          git commit -m "chore(rc): v${NEW}" || true
-          git tag "v${NEW}"
-          git push origin HEAD:recette --follow-tags
 
-      # ✅ Output tag fiable: prend le tag du dernier commit (celui créé dans ce run)
+          # ✅ Commit (ne fait un commit que s'il y a des changements)
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(rc): v${NEW}"
+          else
+            echo "⚠️ No changes to commit"
+          fi
+
+          # 📌 Créer le tag (même s'il existe déjà, pas grave)
+          git tag "v${NEW}" --force
+
+          # 🚀 Push commit + tag séparément
+          git push origin HEAD:staging || true
+          git push origin "v${NEW}" --force || true
+      # ✅ Output tag fiable
       - name: 📌 Output tag
         id: out
         shell: bash
         run: |
           git fetch origin --force --prune --tags
-          # tag pointant sur HEAD si possible, sinon dernier tag créé
+          # Tag pointant sur HEAD si possible
           TAG="$(git tag --points-at HEAD | head -n 1 || true)"
           if [ -z "${TAG:-}" ]; then
             TAG="$(git tag --sort=-creatordate | head -n 1)"
@@ -254,7 +314,7 @@ jobs:
     name: 🐳 Build & Push Docker image to ACR (frontend)
     runs-on: ubuntu-latest
     needs: [frontend-test, dependabot-vuln-scan, versioning]
-    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development' || github.ref_name == 'recette')
+    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development' || github.ref_name == 'staging')
     steps:
       - name: ✨ Checkout
         uses: actions/checkout@v4
@@ -291,7 +351,7 @@ jobs:
     name: 🐳 Build & Push Docker image to ACR (backend)
     runs-on: ubuntu-latest
     needs: [backend-test, dependabot-vuln-scan, versioning]
-    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development' || github.ref_name == 'recette')
+    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development' || github.ref_name == 'staging')
     steps:
       - name: ✨ Checkout
         uses: actions/checkout@v4
@@ -323,5 +383,3 @@ jobs:
         run: |
           docker tag cmatheo.azurecr.io/backend:${{ steps.vars.outputs.tag }} cmatheo.azurecr.io/backend:latest
           docker push cmatheo.azurecr.io/backend:latest
-
-  
