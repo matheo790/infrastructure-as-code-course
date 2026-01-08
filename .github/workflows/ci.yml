@@ -163,15 +163,20 @@ jobs:
         if: github.ref_name == 'development'
         shell: bash
         run: |
-          STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
-          if [ -z "$STABLE" ]; then
+          set -euo pipefail
+
+          # si aucun tag stable n'existe, grep renvoie 1 -> on neutralise
+          STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+
+          if [ -z "${STABLE:-}" ]; then
             BASE="1.0.0"
           else
             BASE="${STABLE#v}"
           fi
 
-          LAST_SNAP=$(git tag --sort=-v:refname | grep -E "^v${BASE}-snapshot\.[0-9]+$" | head -n 1)
-          if [ -z "$LAST_SNAP" ]; then
+          LAST_SNAP=$(git tag --sort=-v:refname | grep -E "^v${BASE}-snapshot\.[0-9]+$" | head -n 1 || true)
+
+          if [ -z "${LAST_SNAP:-}" ]; then
             N=1
           else
             N=$(echo "$LAST_SNAP" | sed -E "s/^v${BASE}-snapshot\.([0-9]+)$/\1/")
