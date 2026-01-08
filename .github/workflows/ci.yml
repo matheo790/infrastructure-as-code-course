@@ -54,6 +54,7 @@ jobs:
       - name: 🟩 Install
         working-directory: apps/frontend
         run: npm ci --legacy-peer-deps
+        run: npm ci --legacy-peer-deps
 
       - name: 🧑‍🎨 Lint
         working-directory: apps/frontend
@@ -81,7 +82,6 @@ jobs:
           npm ci
           npm audit --audit-level=moderate
 
-
       - name: 🔐 Audit frontend
         working-directory: apps/frontend
         run: |
@@ -95,7 +95,7 @@ jobs:
     if: github.event_name != 'pull_request'
     outputs:
       tag: ${{ steps.out.outputs.tag }}
-
+      tag: ${{ steps.out.outputs.tag }}
     steps:
       - name: ✨ Checkout (full + tags)
         uses: actions/checkout@v4
@@ -206,7 +206,6 @@ jobs:
           git fetch --force --tags
           TAG=$(git tag --sort=-creatordate | head -n 1)
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-
 
   docker-backend:
     name: 🐳 Docker backend → ACR
