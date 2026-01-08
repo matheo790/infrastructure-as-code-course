@@ -149,7 +149,6 @@ jobs:
           git fetch origin --force --prune --tags
 
       # ✅ MAIN: release automatique
-            # ✅ MAIN: release automatique
       - name: 🚀 Release on main (bump package.json + tag)
         if: github.ref_name == 'main' && github.actor != 'github-actions[bot]'
         shell: bash
@@ -159,32 +158,34 @@ jobs:
           TYPE="${{ github.event.inputs.release_type || 'patch' }}"
           echo "Release type: $TYPE"
 
-          # 1) Bump version SANS commit auto
-          cd apps/backend
-          npm version "$TYPE" --no-git-tag-version
-          NEW_VER="$(node -p "require('./package.json').version")"
-          cd -
+          # 1) Vérifier la version AVANT
+          CURRENT_VER=$(node -p "require('./apps/backend/package.json').version")
+          echo "Current version = v${CURRENT_VER}"
+
+          # 2) Bump version SANS commit auto
+          (cd apps/backend && npm version "$TYPE" --no-git-tag-version)
+          NEW_VER=$(node -p "require('./apps/backend/package.json').version")
 
           echo "New version = v${NEW_VER}"
 
-          # 2) Commit package.json + package-lock.json
-          git add apps/backend/package.json apps/backend/package-lock.json
-          git add apps/frontend/package.json apps/frontend/package-lock.json
-
-          if git diff --cached --quiet; then
-            echo "❌ package.json n'a pas changé — abort"
+          # 3) Vérifier que la version a changé
+          if [ "${CURRENT_VER}" = "${NEW_VER}" ]; then
+            echo "❌ Version n'a pas changé — abort"
             exit 1
           fi
 
+          # 4) Commit package.json + package-lock.json
+          git add apps/backend/package.json apps/backend/package-lock.json
+          git add apps/frontend/package.json apps/frontend/package-lock.json
+
           git commit -m "chore(release): v${NEW_VER}"
 
-          # 3) Créer le tag (avec --force si existant)
-          git tag "v${NEW_VER}" --force
+          # 5) Créer le tag
+          git tag "v${NEW_VER}"
 
-          # 4) Push commit + tag séparément
+          # 6) Push commit + tag séparément
           git push origin HEAD:main
-          git push origin "v${NEW_VER}" --force
-          
+          git push origin "v${NEW_VER}"
                  # 🧪 DEVELOPMENT: Snapshot version (1.0.0-snapshot.1)
       - name: Snapshot on development
         if: github.ref_name == 'development'
