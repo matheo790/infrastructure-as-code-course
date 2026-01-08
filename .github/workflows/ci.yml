@@ -190,10 +190,11 @@ jobs:
           git commit -m "chore(snapshot): v${NEW}" || true
           git tag "v${NEW}"
           git push origin HEAD:development --tags
+      
 
       # ---- RECETTE: RC tags based on latest stable vX.Y.Z ----
       - name: 🧷 RC on recette (X.Y.Z-RC.N)
-        if: github.ref_name == 'recette'
+        if: github.ref_name == 'staging'
         shell: bash
         run: |
           STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
@@ -221,7 +222,7 @@ jobs:
           git add apps/backend/package.json apps/backend/package-lock.json || true
           git commit -m "chore(rc): v${NEW}" || true
           git tag "v${NEW}"
-          git push origin HEAD:recette --tags
+          git push origin HEAD:staging --tags
 
       - name: 📌 Output tag
         id: out
