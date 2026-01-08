@@ -118,21 +118,19 @@ jobs:
       # MAIN: vX.Y.Z (patch/minor/major)
       # -----------------------------
       - name: 🚀 Main release (npm version + tag)
-        if: github.ref_name == 'main'
+        if: github.ref_name == 'main' && github.actor != 'github-actions[bot]'
         shell: bash
         run: |
           set -euo pipefail
           cd apps/backend
 
-          # Choix: patch/minor/major (workflow_dispatch) sinon patch (push normal)
           RELEASE_TYPE="${{ inputs.release_type }}"
           if [ -z "${RELEASE_TYPE:-}" ]; then
             RELEASE_TYPE="patch"
           fi
 
-          # npm fait tout: bump + commit + tag vX.Y.Z
           npm ci
-          npm version "$RELEASE_TYPE"
+          npm version "$RELEASE_TYPE" -m "chore(release): %s"
 
           cd -
           git push origin HEAD:main --follow-tags
