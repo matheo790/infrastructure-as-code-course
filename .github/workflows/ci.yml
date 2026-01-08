@@ -299,7 +299,6 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Output tag = $TAG"
-
   docker-build-push-acr-frontend:
     name: 🐳 Build & Push Docker image to ACR (frontend)
     runs-on: ubuntu-latest
