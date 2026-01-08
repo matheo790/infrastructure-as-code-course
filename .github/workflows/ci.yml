@@ -15,10 +15,7 @@ on:
         required: true
         default: "patch"
         type: choice
-        options:
-          - patch
-          - minor
-          - major
+        options: [patch, minor, major]
   schedule:
     - cron: '0 3 * * 0'
 
@@ -29,16 +26,25 @@ jobs:
     steps:
       - name: ✨ Checkout
         uses: actions/checkout@v4
+
       - name: 📦 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
+
+      - name: ⬆️ Upgrade npm (fix rollup optional deps)
+        run: |
+          npm i -g npm@11.3.0
+          npm -v
+
       - name: 🟩 Install dependencies
         working-directory: apps/backend
         run: npm ci
+
       - name: 🧑‍🎨 Lint
         working-directory: apps/backend
         run: npm run lint
+
       - name: 🔬 Run unit tests
         working-directory: apps/backend
         run: npm test
@@ -49,19 +55,28 @@ jobs:
     steps:
       - name: ✨ Checkout
         uses: actions/checkout@v4
+
       - name: 📦 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
+
+      - name: ⬆️ Upgrade npm (fix rollup optional deps)
+        run: |
+          npm i -g npm@11.3.0
+          npm -v
+
       - name: 🟩 Install dependencies
         working-directory: apps/frontend
-        run: echo "npm ci --legacy-peer-deps"
+        run: npm ci --legacy-peer-deps
+
       - name: 🧑‍🎨 Lint
         working-directory: apps/frontend
-        run: echo "npm run lint"
+        run: npm run lint
+
       - name: 🔬 Run unit tests
         working-directory: apps/frontend
-        run: echo "npm test"
+        run: npm test
 
   dependabot-vuln-scan:
     name: 🤖 Dependabot vulnerability scan
@@ -71,15 +86,23 @@ jobs:
     steps:
       - name: ✨ Checkout
         uses: actions/checkout@v4
+
       - name: 📦 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
+
+      - name: ⬆️ Upgrade npm (fix rollup optional deps)
+        run: |
+          npm i -g npm@11.3.0
+          npm -v
+
       - name: 🔐 Run npm audit (backend)
         working-directory: apps/backend
         run: |
           npm ci --legacy-peer-deps
           npm audit --audit-level=moderate
+
       - name: 🔐 Run npm audit (frontend)
         working-directory: apps/frontend
         run: |
@@ -94,20 +117,34 @@ jobs:
     outputs:
       tag: ${{ steps.out.outputs.tag }}
     steps:
-      - name: ✨ Checkout full history
+      - name: ✨ Checkout full history + tags
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: true
 
       - name: 📦 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
+
+      - name: ⬆️ Upgrade npm
+        run: |
+          npm i -g npm@11.3.0
+          npm -v
 
       - name: 🔧 Configure Git identity
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: 🏷️ Fetch tags (robust)
+        shell: bash
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git remote -v
+          git fetch origin --force --prune --tags
 
       # ---- MAIN: true releases via npm version patch|minor|major ----
       - name: 🚀 Release on main (npm version)
@@ -115,11 +152,11 @@ jobs:
         run: |
           TYPE="${{ github.event.inputs.release_type || 'patch' }}"
           echo "Release type: $TYPE"
-          # ⚠️ choisis le dossier où est ton package.json "source de vérité"
-          # (si c'est à la racine -> enlève working-directory)
+
           cd apps/backend
           npm version "$TYPE" -m "chore(release): %s"
           cd -
+
           git push origin HEAD:main --follow-tags
 
       # ---- DEV: snapshot tags based on latest stable vX.Y.Z ----
@@ -127,8 +164,6 @@ jobs:
         if: github.ref_name == 'development'
         shell: bash
         run: |
-          git fetch --tags
-
           STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
           if [ -z "$STABLE" ]; then
             BASE="1.0.0"
@@ -147,7 +182,6 @@ jobs:
           NEW="${BASE}-snapshot.${N}"
           echo "New snapshot: v${NEW}"
 
-          # Update version(s) (choisis ton package.json maître)
           cd apps/backend
           npm version "${NEW}" --no-git-tag-version
           cd -
@@ -162,8 +196,6 @@ jobs:
         if: github.ref_name == 'recette'
         shell: bash
         run: |
-          git fetch --tags
-
           STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
           if [ -z "$STABLE" ]; then
             BASE="1.0.0"
@@ -195,7 +227,7 @@ jobs:
         id: out
         shell: bash
         run: |
-          git fetch --tags
+          git fetch origin --force --prune --tags
           TAG=$(git tag --sort=-creatordate | head -n 1)
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
