@@ -184,48 +184,37 @@ jobs:
           git push origin HEAD:main
           git push origin "v${NEW_VER}"
 
-      # ✅ DEVELOPMENT: snapshots
-      - name: 🧪 Snapshot on development (X.Y.Z-snapshot.N)
+            # 🧪 DEVELOPMENT: Snapshot version (1.0.0-snapshot.1)
+      - name: Snapshot on development
         if: github.ref_name == 'development'
-        shell: bash
         run: |
-          set -euo pipefail
-          git fetch origin --force --prune --tags
-
-          # Cherche la dernière version stable
-          STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
-          BASE="${STABLE#v}"; [ -z "${BASE:-}" ] && BASE="1.0.0"
-
-          # Cherche le snapshot existant pour cette base
-          LAST_SNAP=$(git tag --sort=-v:refname | grep -E "^v${BASE}-snapshot\.[0-9]+$" | head -n 1 || true)
-          if [ -z "${LAST_SNAP:-}" ]; then N=1; else N=$(( ${LAST_SNAP##*.} + 1 )); fi
+          # Cherche la dernière version (stable OU snapshot)
+          LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "v1.0.0")
+          BASE="${LATEST_TAG#v}"
+          BASE="${BASE%-snapshot*}"
+          
+          # Cherche le dernier snapshot POUR CETTE base
+          LAST_SNAP=$(git tag --sort=-v:refname | grep "^v${BASE}-snapshot\." | head -1)
+          
+          if [ -z "$LAST_SNAP" ]; then
+            N=1
+          else
+            N=$(echo $LAST_SNAP | grep -o '[0-9]*$')
+            N=$((N + 1))
+          fi
+          
           NEW="${BASE}-snapshot.${N}"
-
-          echo "Creating tag: v${NEW}"
-
-          # 📝 Bump version dans BACKEND
-          cd apps/backend
-          npm version "${NEW}" --no-git-tag-version
-          cd -
-
-          # 📝 Bump version dans FRONTEND
-          cd apps/frontend
-          npm version "${NEW}" --no-git-tag-version
-          cd -
-
-          # 📦 Ajouter les 4 fichiers modifiés
-          git add apps/backend/package.json apps/backend/package-lock.json
-          git add apps/frontend/package.json apps/frontend/package-lock.json
-
-          # ✅ Commit
-          git commit -m "chore(snapshot): v${NEW}" || true
-
-          # 📌 Créer le tag
-          git tag "v${NEW}"
-
-          # 🚀 Push commit + tag séparément
-          git push origin HEAD:development
-          git push origin "v${NEW}"
+          echo "Creating snapshot: v$NEW"
+          
+          # Bump versions
+          (cd apps/backend && npm version $NEW --no-git-tag-version 2>/dev/null || true)
+          (cd apps/frontend && npm version $NEW --no-git-tag-version 2>/dev/null || true)
+          
+          # Commit & tag
+          git add apps/backend/package.json apps/backend/package-lock.json apps/frontend/package.json apps/frontend/package-lock.json
+          git commit -m "chore(snapshot): v$NEW" || true
+          git tag "v$NEW"
+          git push origin HEAD:development --follow-tags
 
         # ✅ STAGING: RC tags
       - name: 🧷 RC on staging (X.Y.Z-RC.N)
