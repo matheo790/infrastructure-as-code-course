@@ -76,11 +76,13 @@ jobs:
           git fetch origin --tags
 
       # 🚀 MAIN: Release version (1.0.0)
+            # 🚀 MAIN: Release version (1.0.0)
       - name: Release on main
         if: github.ref_name == 'main' && github.actor != 'github-actions[bot]'
         run: |
           TYPE="${{ github.event.inputs.release_type || 'patch' }}"
-          cd apps/backend && npm version $TYPE --no-git-tag-version && NEW_VER=$(node -p "require('./package.json').version") && cd -
+          (cd apps/backend && npm version $TYPE --no-git-tag-version && NEW_VER=$(node -p "require('./package.json').version"))
+          NEW_VER=$(node -p "require('./apps/backend/package.json').version")
           git add apps/backend/package.json apps/backend/package-lock.json apps/frontend/package.json apps/frontend/package-lock.json
           git commit -m "chore(release): v$NEW_VER"
           git tag "v$NEW_VER"
@@ -105,8 +107,9 @@ jobs:
           git commit -m "chore(snapshot): v$NEW" || true
           git tag "v$NEW"
           git push origin HEAD:development --follow-tags
-          
+
       # 🧷 STAGING: RC version (1.0.0-RC.1)
+            # 🧷 STAGING: RC version (1.0.0-RC.1)
       - name: RC on staging
         if: github.ref_name == 'staging'
         run: |
@@ -116,13 +119,13 @@ jobs:
           if [ -z "$LAST_RC" ]; then N=1; else N=$(echo $LAST_RC | grep -o '[0-9]*$'); N=$((N+1)); fi
           NEW="${BASE}-RC.${N}"
           
-          cd apps/backend && npm version $NEW --no-git-tag-version 2>/dev/null || true && cd -
-          cd apps/frontend && npm version $NEW --no-git-tag-version 2>/dev/null || true && cd -
+          (cd apps/backend && npm version $NEW --no-git-tag-version 2>/dev/null || true)
+          (cd apps/frontend && npm version $NEW --no-git-tag-version 2>/dev/null || true)
+          
           git add apps/backend/package.json apps/backend/package-lock.json apps/frontend/package.json apps/frontend/package-lock.json
           git commit -m "chore(rc): v$NEW" || true
           git tag "v$NEW" --force
-          git push origin HEAD:staging || true
-          git push origin "v$NEW" --force || true
+          git push origin HEAD:staging --follow-tags
 
       - id: tag
         run: echo "value=$(git tag --sort=-creatordate | head -1)" >> $GITHUB_OUTPUT
