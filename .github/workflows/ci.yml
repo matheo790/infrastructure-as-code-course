@@ -6,7 +6,7 @@ permissions:
 
 on:
   push:
-    branches: [main, development, recette]
+    branches: [main, development, staging]
   pull_request: {}
   workflow_dispatch:
     inputs:
@@ -209,9 +209,9 @@ jobs:
           git tag "v${NEW}"
           git push origin HEAD:development --follow-tags
 
-      # ---- RECETTE: RC tags (tu peux laisser tel quel) ----
-      - name: 🧷 RC on recette (X.Y.Z-RC.N)
-        if: github.ref_name == 'recette'
+      # ---- staging: RC tags (tu peux laisser tel quel) ----
+      - name: 🧷 RC on staging (X.Y.Z-RC.N)
+        if: github.ref_name == 'staging'
         shell: bash
         run: |
           set -euo pipefail
@@ -232,7 +232,7 @@ jobs:
           git add apps/frontend/package.json apps/frontend/package-lock.json || true
           git commit -m "chore(rc): v${NEW}" || true
           git tag "v${NEW}"
-          git push origin HEAD:recette --follow-tags
+          git push origin HEAD:staging --follow-tags
 
       # ✅ Output tag fiable: prend le tag du dernier commit (celui créé dans ce run)
       - name: 📌 Output tag
@@ -252,7 +252,7 @@ jobs:
     name: 🐳 Build & Push Docker image to ACR (frontend)
     runs-on: ubuntu-latest
     needs: [frontend-test, dependabot-vuln-scan, versioning]
-    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development' || github.ref_name == 'recette')
+    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development' || github.ref_name == 'staging')
     steps:
       - name: ✨ Checkout
         uses: actions/checkout@v4
@@ -289,7 +289,7 @@ jobs:
     name: 🐳 Build & Push Docker image to ACR (backend)
     runs-on: ubuntu-latest
     needs: [backend-test, dependabot-vuln-scan, versioning]
-    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development' || github.ref_name == 'recette')
+    if: github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'development' || github.ref_name == 'staging')
     steps:
       - name: ✨ Checkout
         uses: actions/checkout@v4
