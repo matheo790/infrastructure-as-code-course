@@ -147,68 +147,46 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git fetch origin --force --prune --tags
 
-      - name: 🚀 Release on main (bump + tag + push)
-        if: github.ref_name == 'main'
+      # ✅ MAIN: release automatique qui marche (pas de boucle, tag fiable)
+      - name: 🚀 Release on main (bump package.json + tag)
+        if: github.ref_name == 'main' && github.actor != 'github-actions[bot]'
         shell: bash
         run: |
           set -euo pipefail
 
-          # 1) Récupérer tags (important en CI)
-          git fetch --force --tags
+          TYPE="${{ github.event.inputs.release_type || 'patch' }}"
+          echo "Release type: $TYPE"
 
-          # 2) Config git identity pour pouvoir commit/tag
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # 3) Trouver le dernier tag stable (vX.Y.Z)
-          STABLE=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
-
-          if [ -z "${STABLE:-}" ]; then
-            BASE="1.0.0"
-          else
-            BASE="${STABLE#v}"
-          fi
-
-          # 4) Calculer NEW à partir de BASE + release_type (patch/minor/major)
-          RELEASE_TYPE="${{ inputs.release_type || 'patch' }}"
-
-          IFS='.' read -r MA MI PA <<< "$BASE"
-          case "$RELEASE_TYPE" in
-            major) MA=$((MA+1)); MI=0; PA=0 ;;
-            minor) MI=$((MI+1)); PA=0 ;;
-            patch) PA=$((PA+1)) ;;
-            *) echo "release_type invalide: $RELEASE_TYPE (major|minor|patch)"; exit 1 ;;
-          esac
-
-          NEW="${MA}.${MI}.${PA}"
-          echo "New release: v${NEW}"
-
-          # 5) Bump version NPM (backend) sans tag auto
+          # 1) Bump version SANS commit auto
           cd apps/backend
-          npm version "${NEW}" --no-git-tag-version
+          npm version "$TYPE" --no-git-tag-version
+          NEW_VER="$(node -p "require('./package.json').version")"
           cd -
 
-          # 6) Commit + tag + push
+          echo "New version = v${NEW_VER}"
+
+          # 2) Commit package.json + package-lock.json
+          git status --short
+
           git add apps/backend/package.json apps/backend/package-lock.json
+          git add apps/frontend/package.json apps/frontend/package-lock.json
 
-          # si rien n'a changé (ex: même version), on stoppe proprement
           if git diff --cached --quiet; then
-            echo "Nothing to commit (version déjà à ${NEW})."
-            exit 0
-          fi
-
-          git commit -m "chore(main): v${NEW}"
-
-          # éviter erreur si tag existe déjà
-          if git rev-parse "v${NEW}" >/dev/null 2>&1; then
-            echo "Tag v${NEW} existe déjà, abort."
+            echo "❌ package.json n'a pas changé — abort"
             exit 1
           fi
 
-          git tag "v${NEW}"
-          git push origin HEAD:main --tags
+          git commit -m "chore(release): v${NEW_VER}"
+
+          # 3) Créer le tag
+          git tag "v${NEW_VER}"
+
+          # 4) Push commit + tag
+          git push origin HEAD:main
+          git push origin "v${NEW_VER}"
 
 
+      # ---- DEV: snapshot tags (tu peux laisser tel quel) ----
       - name: 🧪 Snapshot on development (X.Y.Z-snapshot.N)
         if: github.ref_name == 'development'
         shell: bash
