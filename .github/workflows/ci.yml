@@ -147,7 +147,6 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git fetch origin --force --prune --tags
 
-<<<<<<< HEAD
       - name: 🚀 Release on main (bump + tag + push)
         if: github.ref_name == 'main'
         shell: bash
@@ -209,48 +208,7 @@ jobs:
           git tag "v${NEW}"
           git push origin HEAD:main --tags
 
-=======
-      # ✅ MAIN: release automatique qui marche (pas de boucle, tag fiable)
-      - name: 🚀 Release on main (bump package.json + tag)
-        if: github.ref_name == 'main' && github.actor != 'github-actions[bot]'
-        shell: bash
-        run: |
-          set -euo pipefail
 
-          TYPE="${{ github.event.inputs.release_type || 'patch' }}"
-          echo "Release type: $TYPE"
-
-          # 1) Bump version SANS commit auto
-          cd apps/backend
-          npm version "$TYPE" --no-git-tag-version
-          NEW_VER="$(node -p "require('./package.json').version")"
-          cd -
-
-          echo "New version = v${NEW_VER}"
->>>>>>> main
-
-          # 2) Commit package.json + package-lock.json
-          git status --short
-
-          git add apps/backend/package.json apps/backend/package-lock.json
-          git add apps/frontend/package.json apps/frontend/package-lock.json
-
-          if git diff --cached --quiet; then
-            echo "❌ package.json n'a pas changé — abort"
-            exit 1
-          fi
-
-          git commit -m "chore(release): v${NEW_VER}"
-
-          # 3) Créer le tag
-          git tag "v${NEW_VER}"
-
-          # 4) Push commit + tag
-          git push origin HEAD:main
-          git push origin "v${NEW_VER}"
-
-
-      # ---- DEV: snapshot tags (tu peux laisser tel quel) ----
       - name: 🧪 Snapshot on development (X.Y.Z-snapshot.N)
         if: github.ref_name == 'development'
         shell: bash
