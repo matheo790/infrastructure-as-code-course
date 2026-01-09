@@ -179,8 +179,8 @@ jobs:
             exit 1
           fi
 
-          git add apps/backend/package.json apps/backend/package-lock.json
-          git add apps/frontend/package.json apps/frontend/package-lock.json
+          git add apps/backend/package.json apps/backend/package-lock.json || true
+          git add apps/frontend/package.json apps/frontend/package-lock.json || true
 
           git commit -m "chore(release): v${NEW_VER}"
 
@@ -212,7 +212,8 @@ jobs:
           (cd apps/backend && npm version $NEW --no-git-tag-version 2>/dev/null || true)
           (cd apps/frontend && npm version $NEW --no-git-tag-version 2>/dev/null || true)
           
-          git add apps/backend/package.json apps/backend/package-lock.json apps/frontend/package.json apps/frontend/package-lock.json
+          git add apps/backend/package.json apps/backend/package-lock.json || true
+          git add apps/frontend/package.json apps/frontend/package-lock.json || true
           git commit -m "chore(snapshot): v$NEW" || true
           git tag "v$NEW" --force
           git push origin HEAD:development || true
