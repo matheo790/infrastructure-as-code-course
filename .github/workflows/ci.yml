@@ -165,8 +165,10 @@ jobs:
             # Extraire la base (X.Y.Z)
             BASE=$(echo "$CURRENT_VER" | sed 's/-RC.*//' | sed 's/-snapshot.*//')
             echo "⚠️ Detected RC/snapshot, bumping from base: $BASE"
-            (cd apps/backend && npm version "$BASE" --no-git-tag-version)
-            (cd apps/frontend && npm version "$BASE" --no-git-tag-version)
+            (cd apps/backend)
+            (npm version "$BASE" --no-git-tag-version)
+            (cd apps/frontend)
+            (npm version "$BASE" --no-git-tag-version)
           fi
 
           (cd apps/backend && npm version "$TYPE" --no-git-tag-version)
