@@ -1,1 +1,1 @@
-Voici un test ultra simple, pour permettre le versionning sur Github. HUM STRANGE
+Voici un test ultra simple, pour permettre le versionning sur Github. HUM STRANG.

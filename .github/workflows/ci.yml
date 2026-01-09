@@ -16,8 +16,6 @@ on:
         default: "patch"
         type: choice
         options: [patch, minor, major]
-  schedule:
-    - cron: '0 3 * * 0'
 
 jobs:
   backend-test:
