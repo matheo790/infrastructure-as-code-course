@@ -149,8 +149,6 @@ jobs:
           git fetch origin --force --prune --tags
 
       # ✅ MAIN: release automatique
-      
-            # ✅ MAIN: release automatique
       - name: 🚀 Release on main (bump package.json + tag)
         if: github.ref_name == 'main' && github.actor != 'github-actions[bot]'
         shell: bash
@@ -160,11 +158,9 @@ jobs:
           TYPE="${{ github.event.inputs.release_type || 'patch' }}"
           echo "Release type: $TYPE"
 
-          # 1) Vérifier la version AVANT
           CURRENT_VER=$(node -p "require('./apps/backend/package.json').version")
           echo "Current version = v${CURRENT_VER}"
 
-          # 2) Si c'est une RC/snapshot, nettoyer avant de bumper
           if [[ "$CURRENT_VER" =~ (-RC|-snapshot) ]]; then
             # Extraire la base (X.Y.Z)
             BASE=$(echo "$CURRENT_VER" | sed 's/-RC.*//' | sed 's/-snapshot.*//')
@@ -173,28 +169,23 @@ jobs:
             (cd apps/frontend && npm version "$BASE" --no-git-tag-version)
           fi
 
-          # 3) Bump version SANS commit auto
           (cd apps/backend && npm version "$TYPE" --no-git-tag-version)
           NEW_VER=$(node -p "require('./apps/backend/package.json').version")
 
           echo "New version = v${NEW_VER}"
 
-          # 4) Vérifier que la version a changé
           if [ "${CURRENT_VER}" = "${NEW_VER}" ]; then
             echo "❌ Version n'a pas changé — abort"
             exit 1
           fi
 
-          # 5) Commit package.json + package-lock.json
           git add apps/backend/package.json apps/backend/package-lock.json
           git add apps/frontend/package.json apps/frontend/package-lock.json
 
           git commit -m "chore(release): v${NEW_VER}"
 
-          # 6) Créer le tag
           git tag "v${NEW_VER}"
 
-          # 7) Push commit + tag séparément
           git push origin HEAD:main
           git push origin "v${NEW_VER}"
 
@@ -202,12 +193,10 @@ jobs:
       - name: Snapshot on development
         if: github.ref_name == 'development'
         run: |
-          # Cherche la dernière version (stable OU snapshot)
           LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "v1.0.0")
           BASE="${LATEST_TAG#v}"
           BASE="${BASE%-snapshot*}"
           
-          # Cherche le dernier snapshot POUR CETTE base
           LAST_SNAP=$(git tag --sort=-v:refname | grep "^v${BASE}-snapshot\." | head -1)
           
           if [ -z "$LAST_SNAP" ]; then
@@ -220,11 +209,9 @@ jobs:
           NEW="${BASE}-snapshot.${N}"
           echo "Creating snapshot: v$NEW"
           
-          # Bump versions
           (cd apps/backend && npm version $NEW --no-git-tag-version 2>/dev/null || true)
           (cd apps/frontend && npm version $NEW --no-git-tag-version 2>/dev/null || true)
           
-          # Commit & tag
           git add apps/backend/package.json apps/backend/package-lock.json apps/frontend/package.json apps/frontend/package-lock.json
           git commit -m "chore(snapshot): v$NEW" || true
           git tag "v$NEW" --force
@@ -239,10 +226,8 @@ jobs:
           set -euo pipefail
           git fetch origin --force --prune --tags
 
-          # Cherche la PLUS HAUTE version (stable + snapshot)
           LAST_VERSION=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | grep -v -E '(-RC|-snapshot)' | head -n 1 || true)
           
-          # Ou cherche le snapshot le plus récent si pas de stable
           if [ -z "${LAST_VERSION:-}" ]; then
             LAST_VERSION=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-snapshot\.[0-9]+)?$' | head -n 1 || true)
           fi
@@ -251,7 +236,6 @@ jobs:
           # Nettoie le suffixe snapshot si présent
           BASE="${BASE%-snapshot*}"
 
-          # Cherche les RC existants pour CETTE base
           LAST_RC=$(git tag --sort=-v:refname | grep -E "^v${BASE}-RC\.[0-9]+$" | head -n 1 || true)
           
           if [ -z "${LAST_RC:-}" ]; then
@@ -263,7 +247,6 @@ jobs:
 
           echo "Creating tag: v${NEW}"
 
-          # 📝 Bump version dans BACKEND (avec gestion d'erreur)
           cd apps/backend
           CURRENT_VER=$(node -p "require('./package.json').version")
           if [ "${CURRENT_VER}" != "${NEW}" ]; then
@@ -273,7 +256,6 @@ jobs:
           fi
           cd -
 
-          # 📝 Bump version dans FRONTEND (avec gestion d'erreur)
           cd apps/frontend
           CURRENT_VER=$(node -p "require('./package.json').version")
           if [ "${CURRENT_VER}" != "${NEW}" ]; then
@@ -287,20 +269,18 @@ jobs:
           git add apps/backend/package.json apps/backend/package-lock.json || true
           git add apps/frontend/package.json apps/frontend/package-lock.json || true
 
-          # ✅ Commit (ne fait un commit que s'il y a des changements)
           if ! git diff --cached --quiet; then
             git commit -m "chore(rc): v${NEW}"
           else
             echo "⚠️ No changes to commit"
           fi
 
-          # 📌 Créer le tag (même s'il existe déjà, pas grave)
           git tag "v${NEW}" --force
 
           # 🚀 Push commit + tag séparément
           git push origin HEAD:staging || true
           git push origin "v${NEW}" --force || true
-      # ✅ Output tag fiable
+
       - name: 📌 Output tag
         id: out
         shell: bash
