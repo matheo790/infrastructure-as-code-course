@@ -113,6 +113,7 @@ jobs:
             git add apps/*/package*.json || true && git commit -m "chore(rc): v$NEW" || true && git tag "v$NEW" --force
             git push origin HEAD:staging || true && git push origin "v$NEW" --force || true
           fi
+      
       - name: 📌 Output tag
         id: out
         shell: bash
