@@ -1,11 +1,9 @@
 {
   "name": "frontend",
   "private": true,
-<<<<<<< HEAD
+
   "version": "1.0.7-RC.1",
-=======
-  "version": "1.0.5",
->>>>>>> origin/main
+
   "type": "module",
   "scripts": {
     "dev": "vite",
