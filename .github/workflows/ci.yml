@@ -93,7 +93,7 @@ jobs:
             git push origin HEAD:main && git push origin "v$NEW"
           elif [ "${{ github.ref_name }}" = "development" ]; then
             LATEST=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "v1.0.0")
-            BASE="${LATEST#v}" && BASE="${BASE%-snapshot*}"
+            BASE="${LATEST#v}" && BASE="${BASE%-snapshot*}" && BASE="${BASE%-RC*}"
             LAST=$(git tag --sort=-v:refname | grep "^v${BASE}-snapshot\." | head -1)
             N=$([[ -z "$LAST" ]] && echo 1 || echo $((${LAST##*.} + 1)))
             NEW="${BASE}-snapshot.${N}"
