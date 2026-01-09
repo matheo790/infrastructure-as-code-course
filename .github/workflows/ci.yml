@@ -144,3 +144,4 @@ jobs:
           docker tag cmatheo.azurecr.io/${{ matrix.app }}:${{ needs.versioning.outputs.tag }} cmatheo.azurecr.io/${{ matrix.app }}:latest
           docker push cmatheo.azurecr.io/${{ matrix.app }}:latest
           
+          
