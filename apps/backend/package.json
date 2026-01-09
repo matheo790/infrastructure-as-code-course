@@ -1,6 +1,10 @@
 {
   "name": "backend",
+<<<<<<< HEAD
   "version": "1.0.7-RC.1",
+=======
+  "version": "1.0.7",
+>>>>>>> origin/main
   "private": true,
   "type": "module",
   "main": "src/index.js",
